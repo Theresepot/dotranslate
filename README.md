@@ -50,7 +50,11 @@ python translator.py
 
 ---
 
-## Windows Installation
+## Windows Installation (few option availabe)
+
+### Simply download executable from Releases 
+
+or run in Python or build:
 
 ### 1. Install Python
 - Download Python 3.8 or newer from the [official Python website](https://www.python.org/downloads/windows/).
