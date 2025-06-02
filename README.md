@@ -20,7 +20,7 @@ A powerful, privacy-friendly desktop translation app with offline OCR and file s
 ![Translation of pdf](screenshots/screenshot2.png)
   
 
-## Installation
+## Installation (for Linux)
 
 ### 1. Build and Install the Standalone Executable (Recommended)
 This is the easiest and most user-friendly way to install dotranslate. It will build the app, install it to `/opt/translator`, and add it to your applications menu.
