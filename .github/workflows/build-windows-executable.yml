@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-    # Only trigger on version file changes
     paths:
       - 'version.txt'
   pull_request:
@@ -34,18 +33,161 @@ jobs:
           python-version: '3.11'
           architecture: 'x64'
 
-      # [Previous dependency installation steps remain the same...]
-      # [Previous build steps remain the same until packaging...]
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install wheel setuptools
+          
+          # Install Kivy dependencies
+          pip install kivy_deps.sdl2==0.6.0
+          pip install kivy_deps.glew==0.3.1
+          pip install kivy_deps.angle==0.3.3
+          
+          # Force Kivy to use ANGLE instead of OpenGL
+          $env:KIVY_GL_BACKEND = "angle_sdl2"
+          pip install kivy==2.2.1
+          
+          # Install other dependencies
+          pip install requests==2.31.0
+          pip install pyinstaller==6.3.0
+          pip install pytesseract==0.3.10
+          pip install Pillow==10.2.0
+          pip install PyPDF2==3.0.1
+          pip install --no-deps PyDictionary
+          pip install goslate --no-deps
+          pip install beautifulsoup4
+
+      - name: Install Tesseract
+        shell: pwsh
+        run: |
+          choco install tesseract -y
+
+      - name: Create no_window.py
+        shell: pwsh
+        run: |
+          @'
+          import os
+          os.environ['KIVY_GL_BACKEND'] = 'angle_sdl2'
+          os.environ['KIVY_NO_ARGS'] = '1'
+          from translator import TranslationApp
+          if __name__ == '__main__':
+              TranslationApp().run()
+          '@ | Out-File -FilePath "no_window.py" -Encoding utf8
+
+      - name: Create spec file
+        shell: pwsh
+        run: |
+          @'
+          # -*- mode: python ; coding: utf-8 -*-
+          
+          import os
+          from kivy_deps import sdl2, glew, angle
+          
+          block_cipher = None
+          
+          a = Analysis(
+              ['no_window.py'],
+              pathex=[],
+              binaries=[],
+              datas=[
+                  ('translator.py', '.'),
+                  (os.path.join(HOMEPATH, 'PyInstaller', 'hooks'), 'PyInstaller/hooks')
+              ],
+              hiddenimports=[
+                  'kivy',
+                  'kivy.deps.sdl2',
+                  'kivy.deps.glew',
+                  'kivy.deps.angle',
+                  'kivy.graphics.angle',
+                  'kivy.graphics',
+                  'kivy.core.window.window_info',
+                  'kivy.core.window.window_sdl2',
+                  'kivy.core.text',
+                  'kivy.factory_registers',
+                  'kivy.input.providers.mouse',
+                  'kivy.input.providers.wm_common',
+                  'nltk',
+                  'PIL',
+                  'pytesseract',
+                  'PyPDF2',
+                  'PyDictionary',
+                  'goslate',
+                  'bs4'
+              ],
+              hookspath=[],
+              hooksconfig={},
+              runtime_hooks=[],
+              excludes=[],
+              win_no_prefer_redirects=False,
+              win_private_assemblies=False,
+              cipher=block_cipher,
+              noarchive=False
+          )
+          
+          pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+          
+          exe = EXE(
+              pyz,
+              a.scripts,
+              a.binaries,
+              a.zipfiles,
+              a.datas,
+              *[Tree(p) for p in (sdl2.dep_bins + glew.dep_bins + angle.dep_bins)],
+              name='dotranslate',
+              debug=False,
+              bootloader_ignore_signals=False,
+              strip=False,
+              upx=True,
+              console=False,
+              disable_windowed_traceback=False,
+              argv_emulation=False,
+              target_arch=None,
+              codesign_identity=None,
+              entitlements_file=None,
+          )
+          '@ | Out-File -FilePath "translator.spec" -Encoding utf8
+
+      - name: Build Executable
+        shell: pwsh
+        run: |
+          # Force use of ANGLE backend
+          $env:KIVY_GL_BACKEND = "angle_sdl2"
+          $env:KIVY_NO_ARGS = "1"
+          $env:KIVY_NO_CONSOLELOG = "1"
+          
+          Write-Host "Starting PyInstaller build..."
+          pyinstaller --clean translator.spec
+          
+          Write-Host "Build complete. Checking dist directory:"
+          Get-ChildItem dist -Recurse | Format-Table Name, Length, LastWriteTime
 
       - name: Package Executable
         shell: pwsh
         run: |
-          Compress-Archive -Path "dist\dotranslate\*" -DestinationPath "dotranslate-windows.zip"
-          # Generate SHA256 checksum
-          $hash = Get-FileHash -Path "dotranslate-windows.zip" -Algorithm SHA256
-          $hash.Hash | Out-File -FilePath "dotranslate-windows.zip.sha256"
+          # Check if dist directory exists and show its contents
+          Write-Host "Checking dist directory contents:"
+          Get-ChildItem dist -Recurse | Format-Table FullName, Length, LastWriteTime
           
-          # Create release notes with version and build info
+          # Create output directory if it doesn't exist
+          New-Item -ItemType Directory -Force -Path output
+          
+          # Package the executable and its dependencies
+          Write-Host "Packaging executable..."
+          if (Test-Path "dist\dotranslate.exe") {
+              Compress-Archive -Path "dist\dotranslate.exe" -DestinationPath "output\dotranslate-windows.zip" -Force
+          } elseif (Test-Path "dist\dotranslate") {
+              Compress-Archive -Path "dist\dotranslate\*" -DestinationPath "output\dotranslate-windows.zip" -Force
+          } else {
+              Write-Host "::error::No executable found in dist directory"
+              exit 1
+          }
+          
+          # Generate SHA256 checksum
+          $hash = Get-FileHash -Path "output\dotranslate-windows.zip" -Algorithm SHA256
+          $hash.Hash | Out-File -FilePath "output\dotranslate-windows.zip.sha256"
+          
+          # Create release notes
           @"
           DoTranslate Windows Build v${{ steps.get_version.outputs.version }}
           Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
@@ -54,7 +196,7 @@ jobs:
           
           ### Changes in this version
           - Please see commit history for detailed changes
-          "@ | Out-File -FilePath "release_notes.txt"
+          "@ | Out-File -FilePath "output\release_notes.txt"
 
       - name: Create Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -65,14 +207,14 @@ jobs:
           $version = "${{ steps.get_version.outputs.version }}"
           $tagName = "v${version}"
           $releaseName = "DoTranslate ${version}"
-          $notes = Get-Content "release_notes.txt" | Out-String
+          $notes = Get-Content "output\release_notes.txt" | Out-String
           
           # Create release and upload assets
           gh release create $tagName `
             --title $releaseName `
             --notes "$notes" `
-            dotranslate-windows.zip `
-            dotranslate-windows.zip.sha256 `
+            "output\dotranslate-windows.zip" `
+            "output\dotranslate-windows.zip.sha256" `
             --target main
 
       - name: Upload Artifacts (for pull requests)
@@ -81,7 +223,7 @@ jobs:
         with:
           name: dotranslate-windows
           path: |
-            dotranslate-windows.zip
-            dotranslate-windows.zip.sha256
-            release_notes.txt
+            output/dotranslate-windows.zip
+            output/dotranslate-windows.zip.sha256
+            output/release_notes.txt
           if-no-files-found: error
