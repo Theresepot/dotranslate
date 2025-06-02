@@ -44,19 +44,20 @@ jobs:
 
       # Step 4: Build the executable
       - name: Build Executable
+        shell: cmd
         run: |
-          mkdir -p dist
+          mkdir dist
           pyinstaller --onefile --name dotranslate ^
-            --hidden-import kivy ^
-            --hidden-import PIL ^
-            --hidden-import pytesseract ^
-            --hidden-import PyPDF2 ^
-            --hidden-import PyDictionary ^
-            --hidden-import nltk ^
-            --hidden-import nltk.tokenize ^
-            --hidden-import goslate ^
-            --collect-all kivy ^
-            main.py
+          --hidden-import kivy ^
+          --hidden-import PIL ^
+          --hidden-import pytesseract ^
+          --hidden-import PyPDF2 ^
+          --hidden-import PyDictionary ^
+          --hidden-import nltk ^
+          --hidden-import nltk.tokenize ^
+          --hidden-import goslate ^
+          --collect-all kivy ^
+          main.py
           dir dist
 
       # Step 5: Verify executable exists
