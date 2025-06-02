@@ -28,8 +28,19 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install wheel setuptools
-          pip install -r requirements.txt
-          python -m nltk.downloader punkt
+          # Install NLTK first
+          pip install nltk
+          python -c "import nltk; nltk.download('punkt')"
+          # Install other dependencies one by one to avoid conflicts
+          pip install kivy==2.2.1
+          pip install requests==2.31.0
+          pip install pyinstaller==6.3.0
+          pip install pytesseract==0.3.10
+          pip install Pillow==10.2.0
+          pip install PyPDF2==3.0.1
+          pip install --no-deps PyDictionary
+          # Install goslate separately without futures
+          pip install goslate --no-deps
 
       # Step 4: Build the executable
       - name: Build Executable
@@ -43,6 +54,8 @@ jobs:
             --hidden-import PyDictionary ^
             --hidden-import nltk ^
             --hidden-import nltk.tokenize ^
+            --hidden-import goslate ^
+            --collect-all kivy ^
             main.py
           dir dist
 
