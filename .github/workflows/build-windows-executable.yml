@@ -1,5 +1,11 @@
 name: Build Windows Executable
 
+# This permissions block automatically handles all required permissions
+permissions:
+  contents: write
+  packages: write
+  actions: write
+
 on:
   push:
     branches:
@@ -201,7 +207,7 @@ jobs:
       - name: Create Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
         run: |
           $version = "${{ steps.get_version.outputs.version }}"
