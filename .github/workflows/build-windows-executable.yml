@@ -30,7 +30,8 @@ jobs:
           pip install wheel setuptools
           # Install NLTK first
           pip install nltk
-          python -c "import nltk; nltk.download('punkt')"
+          python -c "import nltk; nltk.download('punkt', quiet=True)"
+          python -c "import nltk; nltk.download('wordnet', quiet=True)"
           # Install other dependencies one by one to avoid conflicts
           pip install kivy==2.2.1
           pip install requests==2.31.0
@@ -39,38 +40,57 @@ jobs:
           pip install Pillow==10.2.0
           pip install PyPDF2==3.0.1
           pip install --no-deps PyDictionary
-          # Install goslate separately without futures
           pip install goslate --no-deps
+          pip install beautifulsoup4
 
-      # Step 4: Build the executable
+      # Step 4: Install Tesseract OCR
+      - name: Install Tesseract
+        run: |
+          choco install tesseract -y
+          refreshenv
+
+      # Step 5: Build the executable
       - name: Build Executable
         shell: cmd
         run: |
-          mkdir dist
-          pyinstaller --onefile --name dotranslate ^
+          echo "Starting PyInstaller build..."
+          pyinstaller --onefile ^
+          --name dotranslate ^
+          --hidden-import nltk ^
+          --hidden-import nltk.tokenize ^
+          --hidden-import nltk.corpus ^
+          --hidden-import nltk.corpus.wordnet ^
           --hidden-import kivy ^
           --hidden-import PIL ^
           --hidden-import pytesseract ^
           --hidden-import PyPDF2 ^
           --hidden-import PyDictionary ^
-          --hidden-import nltk ^
-          --hidden-import nltk.tokenize ^
           --hidden-import goslate ^
+          --hidden-import beautifulsoup4 ^
           --collect-all kivy ^
-          main.py
+          --collect-all nltk ^
+          translator.py
+          
+          echo "Build complete. Checking dist directory:"
           dir dist
 
-      # Step 5: Verify executable exists
+      # Step 6: Verify executable exists
       - name: Verify Build
+        shell: cmd
         run: |
-          if (Test-Path "dist/dotranslate.exe") {
-              echo "Executable was built successfully"
-          } else {
-              echo "::error::Executable was not built"
-              exit 1
-          }
+          if exist "dist\dotranslate.exe" (
+            echo "Executable was built successfully"
+            echo "File size:"
+            dir "dist\dotranslate.exe"
+          ) else (
+            echo "::error::Executable was not built - checking build logs"
+            if exist "build\dotranslate\warn-dotranslate.txt" (
+              type "build\dotranslate\warn-dotranslate.txt"
+            )
+            exit /b 1
+          )
 
-      # Step 6: Upload the artifact
+      # Step 7: Upload the artifact
       - name: Upload Executable
         if: success()
         uses: actions/upload-artifact@v4
@@ -78,3 +98,14 @@ jobs:
           name: dotranslate-windows
           path: dist/dotranslate.exe
           if-no-files-found: error
+
+      # Step 8: Upload build logs on failure
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build/**/*.txt
+            *.spec
+            build/**/*.log
