@@ -24,24 +24,21 @@ jobs:
           python-version: '3.11'
           architecture: 'x64'
 
-      # Step 3: Verify Python version and environment
-      - name: Verify Python
-        shell: pwsh
-        run: |
-          Write-Host "Python version:"
-          python --version
-          Write-Host "Python location:"
-          where.exe python
-          Write-Host "Pip location:"
-          where.exe pip
-
-      # Step 4: Install dependencies
+      # Step 3: Install dependencies
       - name: Install dependencies
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           pip install wheel setuptools
-          pip install pyinstaller==6.3.0
+          
+          # Install Kivy dependencies first
+          pip install kivy_deps.sdl2==0.6.0
+          pip install kivy_deps.glew==0.3.1
+          pip install kivy_deps.gstreamer==0.3.3
+          pip install kivy_deps.angle==0.3.3
+          
+          # Install Kivy
+          pip install kivy==2.2.1
           
           # Install NLTK and download required data
           pip install nltk
@@ -49,19 +46,16 @@ jobs:
           python -c "import nltk; nltk.download('wordnet', quiet=True)"
           
           # Install other dependencies
-          pip install kivy==2.2.1
           pip install requests==2.31.0
+          pip install pyinstaller==6.3.0
           pip install pytesseract==0.3.10
           pip install Pillow==10.2.0
           pip install PyPDF2==3.0.1
           pip install --no-deps PyDictionary
           pip install goslate --no-deps
           pip install beautifulsoup4
-          
-          # Verify installations
-          pip list
 
-      # Step 5: Install Tesseract OCR
+      # Step 4: Install Tesseract OCR
       - name: Install Tesseract
         shell: pwsh
         run: |
@@ -69,55 +63,127 @@ jobs:
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
           Write-Host "Tesseract version:"
           tesseract --version
-          Write-Host "Tesseract location:"
-          where.exe tesseract
 
-      # Step 6: Create directories
-      - name: Create build directories
+      # Step 5: Create PyInstaller hooks
+      - name: Create PyInstaller hooks
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist
-          New-Item -ItemType Directory -Force -Path build
+          $hookContent = @"
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-      # Step 7: Build the executable
+# Add Kivy hooks
+hiddenimports = collect_submodules('kivy')
+datas = collect_data_files('kivy')
+
+# Add additional dependencies
+hiddenimports += [
+    'kivy.deps.sdl2',
+    'kivy.deps.glew',
+    'kivy.deps.gstreamer',
+    'kivy.deps.angle',
+    'kivy.factory_registers',
+    'kivy.input.providers.mouse',
+    'kivy.input.providers.wm_common',
+    'kivy.input.providers.wm_touch',
+    'kivy.input.providers.wm_pen',
+    'kivy.core.window.window_info',
+    'kivy.core.window.window_sdl2',
+    'kivy.core.text.text_sdl2',
+    'kivy.core.text',
+    'kivy.core.audio',
+    'kivy.core.camera',
+    'kivy.core.clipboard',
+    'kivy.core.image',
+    'kivy.core.spelling',
+    'kivy.core.video',
+    'kivy.core.window',
+    'kivy.graphics.context_instructions',
+    'kivy.graphics.fbo',
+    'kivy.graphics.instructions',
+    'kivy.graphics.shader',
+    'kivy.graphics.texture',
+    'kivy.graphics.transformation',
+    'kivy.graphics.vbo',
+    'kivy.graphics.vertex',
+    'kivy.graphics.vertex_instructions',
+    'kivy.support',
+    'nltk',
+    'PIL',
+    'pytesseract',
+    'PyPDF2',
+    'PyDictionary',
+    'goslate',
+    'bs4'
+]
+
+# Add binary dependencies
+binaries = []
+"@
+          $hookContent | Out-File -FilePath "hook-translator.py" -Encoding utf8
+
+      # Step 6: Build the executable
       - name: Build Executable
         shell: pwsh
         run: |
           Write-Host "Starting PyInstaller build..."
-          Write-Host "Current directory: $(Get-Location)"
-          Write-Host "Directory contents:"
-          Get-ChildItem
           
-          # Set Python path explicitly
-          $pythonPath = Get-Command python | Select-Object -ExpandProperty Source
-          Write-Host "Using Python from: $pythonPath"
-          
-          & $pythonPath -m PyInstaller `
-            --onefile `
-            --name dotranslate `
-            --hidden-import nltk `
-            --hidden-import nltk.tokenize `
-            --hidden-import nltk.corpus `
-            --hidden-import nltk.corpus.wordnet `
-            --hidden-import kivy `
-            --hidden-import PIL `
-            --hidden-import pytesseract `
-            --hidden-import PyPDF2 `
-            --hidden-import PyDictionary `
-            --hidden-import goslate `
-            --hidden-import beautifulsoup4 `
-            --collect-all kivy `
-            --collect-all nltk `
-            translator.py
+          # Create the spec file
+          $specContent = @"
+# -*- mode: python ; coding: utf-8 -*-
 
+from kivy_deps import sdl2, glew, gstreamer, angle
+
+block_cipher = None
+
+a = Analysis(
+    ['translator.py'],
+    pathex=[],
+    binaries=[],
+    datas=[],
+    hiddenimports=[],
+    hookspath=['.'],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    *[Tree(p) for p in (sdl2.dep_bins + glew.dep_bins + gstreamer.dep_bins + angle.dep_bins)],
+    name='dotranslate',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+"@
+          $specContent | Out-File -FilePath "translator.spec" -Encoding utf8
+          
+          # Build using the spec file
+          pyinstaller --clean translator.spec
+          
           Write-Host "Build complete. Checking dist directory:"
-          if (Test-Path dist) {
-              Get-ChildItem dist | Format-Table Name, Length, LastWriteTime
-          } else {
-              Write-Host "dist directory was not created"
-          }
+          Get-ChildItem dist | Format-Table Name, Length, LastWriteTime
 
-      # Step 8: Verify executable exists and show build info
+      # Step 7: Verify executable exists
       - name: Verify Build
         shell: pwsh
         run: |
@@ -129,14 +195,10 @@ jobs:
               Write-Host "::error::Executable was not built"
               Write-Host "Current directory contents:"
               Get-ChildItem -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
-              Write-Host "PyInstaller build logs:"
-              if (Test-Path "build/dotranslate/warn-dotranslate.txt") {
-                  Get-Content "build/dotranslate/warn-dotranslate.txt"
-              }
               exit 1
           }
 
-      # Step 9: Upload the artifact
+      # Step 8: Upload the artifact
       - name: Upload Executable
         if: success()
         uses: actions/upload-artifact@v4
@@ -144,14 +206,3 @@ jobs:
           name: dotranslate-windows
           path: dist/dotranslate.exe
           if-no-files-found: error
-
-      # Step 10: Upload build logs on failure
-      - name: Upload build logs
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: |
-            build/
-            *.spec
-          if-no-files-found: warn
