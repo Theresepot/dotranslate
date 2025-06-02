@@ -52,9 +52,10 @@ python translator.py
 
 ## Windows Installation (few option availabe)
 
-### Simply download executable from Releases 
+### Simply download executable from [Releases](https://github.com/Theresepot/dotranslate/releases)
 
-or run in Python or build:
+
+ -- or run in Python; or build your own: 
 
 ### 1. Install Python
 - Download Python 3.8 or newer from the [official Python website](https://www.python.org/downloads/windows/).
