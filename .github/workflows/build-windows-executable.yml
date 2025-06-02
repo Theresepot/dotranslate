@@ -62,8 +62,8 @@ jobs:
           Write-Host "Starting PyInstaller build..."
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
           
-          # Create spec file first
-          pyi-makespec --onefile `
+          python -m PyInstaller `
+            --onefile `
             --name dotranslate `
             --hidden-import nltk `
             --hidden-import nltk.tokenize `
@@ -80,9 +80,6 @@ jobs:
             --collect-all nltk `
             translator.py
 
-          # Build using the spec file
-          pyinstaller --clean dotranslate.spec
-          
           Write-Host "Build complete. Checking dist directory:"
           Get-ChildItem dist | Format-Table Name, Length, LastWriteTime
 
