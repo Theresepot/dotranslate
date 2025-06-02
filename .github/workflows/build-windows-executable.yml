@@ -11,6 +11,7 @@ on:
 jobs:
   build-windows-executable:
     runs-on: windows-2022
+    timeout-minutes: 15  # Add timeout to prevent infinite builds
 
     steps:
       # Step 1: Check out the repository
@@ -34,7 +35,6 @@ jobs:
           # Install Kivy dependencies first
           pip install kivy_deps.sdl2==0.6.0
           pip install kivy_deps.glew==0.3.1
-          pip install kivy_deps.gstreamer==0.3.3
           pip install kivy_deps.angle==0.3.3
           
           # Install Kivy
@@ -61,112 +61,84 @@ jobs:
         run: |
           choco install tesseract -y
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-          Write-Host "Tesseract version:"
-          tesseract --version
 
-      # Step 5: Create PyInstaller hook and spec files
-      - name: Create PyInstaller files
+      # Step 5: Create spec file
+      - name: Create PyInstaller spec
         shell: pwsh
         run: |
-          # Create hook file
-          @'
-          from PyInstaller.utils.hooks import collect_data_files, collect_submodules
-
-          # Add Kivy hooks
-          hiddenimports = collect_submodules('kivy')
-          datas = collect_data_files('kivy')
-
-          # Add additional dependencies
-          hiddenimports += [
-              'kivy.deps.sdl2',
-              'kivy.deps.glew',
-              'kivy.deps.gstreamer',
-              'kivy.deps.angle',
-              'kivy.factory_registers',
-              'kivy.input.providers.mouse',
-              'kivy.input.providers.wm_common',
-              'kivy.input.providers.wm_touch',
-              'kivy.input.providers.wm_pen',
-              'kivy.core.window.window_info',
-              'kivy.core.window.window_sdl2',
-              'kivy.core.text.text_sdl2',
-              'kivy.core.text',
-              'kivy.core.audio',
-              'kivy.core.camera',
-              'kivy.core.clipboard',
-              'kivy.core.image',
-              'kivy.core.spelling',
-              'kivy.core.video',
-              'kivy.core.window',
-              'kivy.graphics.context_instructions',
-              'kivy.graphics.fbo',
-              'kivy.graphics.instructions',
-              'kivy.graphics.shader',
-              'kivy.graphics.texture',
-              'kivy.graphics.transformation',
-              'kivy.graphics.vbo',
-              'kivy.graphics.vertex',
-              'kivy.graphics.vertex_instructions',
-              'kivy.support',
-              'nltk',
-              'PIL',
-              'pytesseract',
-              'PyPDF2',
-              'PyDictionary',
-              'goslate',
-              'bs4'
-          ]
-
-          # Add binary dependencies
-          binaries = []
-          '@ | Out-File -FilePath "hook-translator.py" -Encoding utf8
-
-          # Create spec file
           @'
           # -*- mode: python ; coding: utf-8 -*-
 
-          from kivy_deps import sdl2, glew, gstreamer, angle
-
-          block_cipher = None
+          from kivy_deps import sdl2, glew, angle
 
           a = Analysis(
               ['translator.py'],
               pathex=[],
               binaries=[],
-              datas=[],
-              hiddenimports=[],
-              hookspath=['.'],
+              datas=[('C:\\\\hostedtoolcache\\\\windows\\\\Python\\\\3.11.9\\\\x64\\\\Lib\\\\site-packages\\\\kivy\\\\data', 'kivy_install\\\\data')],
+              hiddenimports=[
+                  'kivy.deps.sdl2',
+                  'kivy.deps.glew',
+                  'kivy.deps.angle',
+                  'kivy.factory_registers',
+                  'kivy.input.providers.mouse',
+                  'kivy.input.providers.wm_common',
+                  'kivy.input.providers.wm_touch',
+                  'kivy.input.providers.wm_pen',
+                  'kivy.core.window.window_info',
+                  'kivy.core.window.window_sdl2',
+                  'kivy.core.text.text_sdl2',
+                  'kivy.core.text',
+                  'kivy.core.clipboard',
+                  'kivy.core.image',
+                  'kivy.graphics',
+                  'nltk',
+                  'PIL',
+                  'pytesseract',
+                  'PyPDF2',
+                  'PyDictionary',
+                  'goslate',
+                  'bs4'
+              ],
+              hookspath=[],
               hooksconfig={},
               runtime_hooks=[],
               excludes=[],
               win_no_prefer_redirects=False,
               win_private_assemblies=False,
-              cipher=block_cipher,
-              noarchive=False,
+              noarchive=False
           )
 
-          pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+          pyz = PYZ(a.pure, a.zipped_data)
 
           exe = EXE(
               pyz,
               a.scripts,
-              a.binaries,
-              a.zipfiles,
-              a.datas,
-              *[Tree(p) for p in (sdl2.dep_bins + glew.dep_bins + gstreamer.dep_bins + angle.dep_bins)],
+              [],
+              exclude_binaries=True,
               name='dotranslate',
               debug=False,
               bootloader_ignore_signals=False,
               strip=False,
               upx=True,
-              upx_exclude=[],
-              runtime_tmpdir=None,
-              console=True,
+              console=False,
               disable_windowed_traceback=False,
               argv_emulation=False,
               target_arch=None,
               codesign_identity=None,
               entitlements_file=None,
+          )
+
+          coll = COLLECT(
+              exe,
+              a.binaries,
+              a.zipfiles,
+              a.datas,
+              *[Tree(p) for p in (sdl2.dep_bins + glew.dep_bins + angle.dep_bins)],
+              strip=False,
+              upx=True,
+              upx_exclude=[],
+              name='dotranslate'
           )
           '@ | Out-File -FilePath "translator.spec" -Encoding utf8
 
@@ -174,25 +146,20 @@ jobs:
       - name: Build Executable
         shell: pwsh
         run: |
+          # Set environment variables to prevent Kivy from initializing graphics
+          $env:KIVY_NO_ARGS = "1"
+          $env:KIVY_NO_CONSOLELOG = "1"
+          
           Write-Host "Starting PyInstaller build..."
           pyinstaller --clean translator.spec
           Write-Host "Build complete. Checking dist directory:"
-          Get-ChildItem dist | Format-Table Name, Length, LastWriteTime
+          Get-ChildItem dist\dotranslate -Recurse | Format-Table FullName, Length, LastWriteTime
 
-      # Step 7: Verify executable exists
-      - name: Verify Build
+      # Step 7: Package the executable
+      - name: Package Executable
         shell: pwsh
         run: |
-          $exePath = "dist/dotranslate.exe"
-          if (Test-Path $exePath) {
-              Write-Host "Executable was built successfully"
-              Get-Item $exePath | Select-Object FullName, Length, CreationTime, LastWriteTime | Format-List
-          } else {
-              Write-Host "::error::Executable was not built"
-              Write-Host "Current directory contents:"
-              Get-ChildItem -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
-              exit 1
-          }
+          Compress-Archive -Path "dist\dotranslate" -DestinationPath "dotranslate-windows.zip"
 
       # Step 8: Upload the artifact
       - name: Upload Executable
@@ -200,5 +167,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dotranslate-windows
-          path: dist/dotranslate.exe
+          path: dotranslate-windows.zip
           if-no-files-found: error
