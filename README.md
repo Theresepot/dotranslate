@@ -50,7 +50,7 @@ python translator.py
 
 ---
 
-## Windows Installation (few option availabe)
+## Windows Installation (few options availabe)
 
 ### Simply download executable from [Releases](https://github.com/Theresepot/dotranslate/releases)
 
