@@ -25,7 +25,7 @@ A powerful, privacy-friendly desktop translation app with offline OCR and file s
 ### Simply download compiled executables for Windows or Linux from [Releases](https://github.com/Theresepot/dotranslate/releases)
 
 
-### - - - or build in a few clicks from source - - - 
+ - - - or build in a few clicks from source - - - 
 
 ## Linux:
 
