@@ -1,98 +1,74 @@
-name: Linux Build
+name: Linux Manual Build
 
 on:
-  push:
-    paths:
-      - 'version.txt'
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
-  build-debian:
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        debian-version: ['11', '12']
-        include:
-          - debian-version: '11'
-            container-tag: 'bullseye'
-          - debian-version: '12'
-            container-tag: 'bookworm'
-
     permissions:
       contents: write
-      packages: write
-
+      
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Set up Docker
-      run: |
-        docker pull debian:${{ matrix.container-tag }}
-
-    - name: Build in Docker
-      run: |
-        docker run --rm \
-          -v ${{ github.workspace }}:/workspace \
-          debian:${{ matrix.container-tag }} \
-          bash -c '
-            cd /workspace
-            apt-get update
-            apt-get install -y python3 python3-pip python3-venv fakeroot dpkg-dev
-            python3 -m pip install --upgrade pip
-            python3 -m pip install pyinstaller
-            if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-            
-            # Get version
-            VERSION=$(cat version.txt)
-            
-            # Build with PyInstaller
-            pyinstaller --onefile --name dotranslate main.py
-            
-            # Create Debian package structure
-            mkdir -p debian-package/DEBIAN
-            mkdir -p debian-package/usr/local/bin
-            
-            # Copy executable
-            cp dist/dotranslate debian-package/usr/local/bin/
-            chmod +x debian-package/usr/local/bin/dotranslate
-            
-            # Create control file
-            cat > debian-package/DEBIAN/control << EOF
-            Package: dotranslate
-            Version: $VERSION
-            Section: utils
-            Priority: optional
-            Architecture: amd64
-            Maintainer: Theresepot
-            Description: DoTranslate - A translation tool
-             A tool for translating text using various translation services.
-            EOF
-            
-            # Build the package
-            dpkg-deb --build debian-package
-            
-            # Rename the package
-            mv debian-package.deb dotranslate_${VERSION}_debian${{ matrix.debian-version }}_amd64.deb
-          '
-
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
       with:
-        name: dotranslate-debian${{ matrix.debian-version }}
-        path: dotranslate_*_debian${{ matrix.debian-version }}_amd64.deb
+        python-version: '3.10'  # Specifically using Python 3.10 for better compatibility
+        cache: 'pip'
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      if: github.ref == 'refs/heads/main'
-      with:
-        files: dotranslate_*_debian${{ matrix.debian-version }}_amd64.deb
-        tag_name: v$(cat version.txt)
-        draft: false
-        prerelease: false
-        append_body: true
-        body: |
-          Debian ${{ matrix.debian-version }} build added
+    - name: Build
+      run: |
+        # Install dependencies
+        sudo apt-get update
+        sudo apt-get install -y fakeroot dpkg-dev
+        python -m pip install --upgrade pip
+        pip install 'pyinstaller<6.0'  # Using an older, more stable version
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        fi
+
+        # Get version
+        VERSION=$(cat version.txt)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+        # Build executable
+        pyinstaller --onefile --name dotranslate translator.py
+
+        # Create package
+        mkdir -p debian-package/DEBIAN debian-package/usr/local/bin
+        cp dist/dotranslate debian-package/usr/local/bin/
+        chmod +x debian-package/usr/local/bin/dotranslate
+
+        # Create control file
+        cat > debian-package/DEBIAN/control << EOF
+        Package: dotranslate
+        Version: $VERSION
+        Section: utils
+        Priority: optional
+        Architecture: amd64
+        Maintainer: Theresepot
+        Description: DoTranslate - A translation tool
+         A tool for translating text using various translation services.
+        EOF
+
+        # Build and rename package
+        dpkg-deb --build debian-package
+        mv debian-package.deb dotranslate_${VERSION}_amd64.deb
+
+        # Generate checksum
+        sha256sum dotranslate_${VERSION}_amd64.deb > SHA256SUMS
+
+    - name: Release
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh release upload v${{ env.VERSION }} dotranslate_${{ env.VERSION }}_amd64.deb SHA256SUMS --clobber
+        gh release edit v${{ env.VERSION }} --notes-append "
+        
+        Linux build added
+        - Build Date: $(date -u '+%Y-%m-%d %H:%M:%S') UTC
+        - Architecture: amd64
+        - SHA256: $(cat SHA256SUMS)"
