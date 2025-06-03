@@ -93,15 +93,20 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh release upload v${{ env.VERSION }} \
-          dotranslate_${VERSION}_amd64.deb \
-          SHA256SUMS \
-          --clobber
+        # Upload artifacts
+        gh release upload v${VERSION} dotranslate_${VERSION}_amd64.deb SHA256SUMS --clobber
         
-        gh release edit v${{ env.VERSION }} --notes-append "
+        # Get existing release notes
+        EXISTING_NOTES=$(gh release view v${VERSION} --json body -q '.body')
+        
+        # Prepare new notes
+        NEW_NOTES="${EXISTING_NOTES}
 
         Linux build added
         - Build Date: $(date -u '+%Y-%m-%d %H:%M:%S') UTC
         - Architecture: amd64
         - SHA256: $(cat SHA256SUMS)
         - Dependencies: SDL2, MTDev, Python3"
+        
+        # Update release with combined notes
+        gh release edit v${VERSION} -n "$NEW_NOTES"
