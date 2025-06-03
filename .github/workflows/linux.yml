@@ -1,0 +1,96 @@
+name: Linux Build
+
+on:
+  push:
+    paths:
+      - 'version.txt'
+    branches: [ "main" ]
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  build-debian:
+    strategy:
+      matrix:
+        debian-version: ['11', '12']
+        include:
+          - debian-version: '11'
+            container-tag: 'bullseye'
+          - debian-version: '12'
+            container-tag: 'bookworm'
+    
+    runs-on: ubuntu-latest
+    container: 
+      image: debian:${{ matrix.container-tag }}
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      run: |
+        apt-get update
+        apt-get install -y python3 python3-pip python3-venv
+
+    - name: Install dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        python3 -m pip install pyinstaller
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    - name: Get version
+      id: get_version
+      run: echo "version=$(cat version.txt)" >> $GITHUB_OUTPUT
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --onefile --name dotranslate main.py
+
+    - name: Create Debian Package
+      run: |
+        # Install required tools
+        apt-get install -y fakeroot dpkg-dev
+
+        # Create package directory structure
+        mkdir -p debian-package/DEBIAN
+        mkdir -p debian-package/usr/local/bin
+
+        # Copy executable
+        cp dist/dotranslate debian-package/usr/local/bin/
+        chmod +x debian-package/usr/local/bin/dotranslate
+
+        # Create control file
+        cat > debian-package/DEBIAN/control << EOF
+        Package: dotranslate
+        Version: ${{ steps.get_version.outputs.version }}
+        Section: utils
+        Priority: optional
+        Architecture: amd64
+        Maintainer: Theresepot
+        Description: DoTranslate - A translation tool
+         A tool for translating text using various translation services.
+        EOF
+
+        # Build the package
+        dpkg-deb --build debian-package
+
+        # Rename the package to include version and Debian version
+        mv debian-package.deb dotranslate_${{ steps.get_version.outputs.version }}_debian${{ matrix.debian-version }}_amd64.deb
+
+    - name: Upload Debian Package
+      uses: actions/upload-artifact@v3
+      with:
+        name: dotranslate-debian${{ matrix.debian-version }}
+        path: dotranslate_${{ steps.get_version.outputs.version }}_debian${{ matrix.debian-version }}_amd64.deb
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      if: github.ref == 'refs/heads/main'
+      with:
+        files: dotranslate_${{ steps.get_version.outputs.version }}_debian${{ matrix.debian-version }}_amd64.deb
+        tag_name: v${{ steps.get_version.outputs.version }}
+        draft: false
+        prerelease: false
+        append_body: true
+        body: |
+          Debian ${{ matrix.debian-version }} build added
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
