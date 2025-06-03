@@ -1,0 +1,68 @@
+name: Linux Manual Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y fakeroot dpkg-dev
+        python -m pip install --upgrade pip
+        python -m pip install pyinstaller
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    - name: Get version
+      id: version
+      run: echo "version=$(cat version.txt)" >> $GITHUB_OUTPUT
+
+    - name: Build with PyInstaller
+      run: pyinstaller --onefile --name dotranslate translator.py
+
+    - name: Create Debian package
+      run: |
+        mkdir -p debian-package/DEBIAN
+        mkdir -p debian-package/usr/local/bin
+        cp dist/dotranslate debian-package/usr/local/bin/
+        chmod +x debian-package/usr/local/bin/dotranslate
+        cat > debian-package/DEBIAN/control << EOF
+        Package: dotranslate
+        Version: ${{ steps.version.outputs.version }}
+        Section: utils
+        Priority: optional
+        Architecture: amd64
+        Maintainer: Theresepot
+        Description: DoTranslate - A translation tool
+         A tool for translating text using various translation services.
+        EOF
+        dpkg-deb --build debian-package
+        mv debian-package.deb dotranslate_${{ steps.version.outputs.version }}_amd64.deb
+
+    - name: List files
+      run: ls -la
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dotranslate_${{ steps.version.outputs.version }}_amd64.deb
+        tag_name: v${{ steps.version.outputs.version }}
+        draft: false
+        prerelease: false
+        append_body: true
+        body: |
+          Linux build added
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
