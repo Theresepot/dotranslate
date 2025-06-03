@@ -24,7 +24,10 @@ A powerful, privacy-friendly desktop translation app with offline OCR and file s
 
 ### Simply download compiled executables for Windows or Linux from [Releases](https://github.com/Theresepot/dotranslate/releases)
 
-## - - - or build in a few clicks from source - - - 
+
+### - - - or build in a few clicks from source - - - 
+
+## Linux:
 
 ### 1. Build and Install the Standalone Executable (Recommended)
 This is the easiest and most user-friendly way to install dotranslate. It will build the app, install it to `/opt/translator`, and add it to your applications menu.
@@ -54,7 +57,7 @@ python translator.py
 
 ---
 
-## Windows - run in Python; or build your own: 
+## Windows (run in Python): 
 
 ### 1. Install Python
 - Download Python 3.8 or newer from the [official Python website](https://www.python.org/downloads/windows/).
@@ -110,8 +113,8 @@ pip install -r requirements.txt
 python translator.py
 ```
 
-### 8. (Optional) Build a Standalone Executable
-If you want a Windows `.exe`:
+### 8. (Optional) Build a Standalone Executable yourself:
+If you want to build a Windows `.exe` yourself:
 ```sh
 pyinstaller --onefile --windowed translator.py
 ```
