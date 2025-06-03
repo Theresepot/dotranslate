@@ -5,7 +5,12 @@ on:
     paths:
       - 'version.txt'
     branches: [ "main" ]
-  workflow_dispatch:  # Allows manual triggering
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+  actions: write
 
 jobs:
   build-debian:
@@ -23,26 +28,32 @@ jobs:
       image: debian:${{ matrix.container-tag }}
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v4
     
     - name: Set up Python
       run: |
         apt-get update
-        apt-get install -y python3 python3-pip python3-venv
+        apt-get install -y python3 python3-pip python3-venv git curl
+      shell: bash
 
     - name: Install dependencies
       run: |
         python3 -m pip install --upgrade pip
         python3 -m pip install pyinstaller
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      shell: bash
 
     - name: Get version
       id: get_version
-      run: echo "version=$(cat version.txt)" >> $GITHUB_OUTPUT
+      run: |
+        echo "version=$(cat version.txt)" >> $GITHUB_OUTPUT
+      shell: bash
 
     - name: Build with PyInstaller
       run: |
         pyinstaller --onefile --name dotranslate main.py
+      shell: bash
 
     - name: Create Debian Package
       run: |
@@ -74,18 +85,26 @@ jobs:
 
         # Rename the package to include version and Debian version
         mv debian-package.deb dotranslate_${{ steps.get_version.outputs.version }}_debian${{ matrix.debian-version }}_amd64.deb
+      shell: bash
+
+    - name: Create artifact directory
+      run: |
+        mkdir -p artifacts
+        cp dotranslate_${{ steps.get_version.outputs.version }}_debian${{ matrix.debian-version }}_amd64.deb artifacts/
+      shell: bash
 
     - name: Upload Debian Package
       uses: actions/upload-artifact@v3
       with:
         name: dotranslate-debian${{ matrix.debian-version }}
-        path: dotranslate_${{ steps.get_version.outputs.version }}_debian${{ matrix.debian-version }}_amd64.deb
+        path: artifacts/*.deb
+        if-no-files-found: error
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
       if: github.ref == 'refs/heads/main'
       with:
-        files: dotranslate_${{ steps.get_version.outputs.version }}_debian${{ matrix.debian-version }}_amd64.deb
+        files: artifacts/*.deb
         tag_name: v${{ steps.get_version.outputs.version }}
         draft: false
         prerelease: false
