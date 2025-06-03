@@ -1,4 +1,4 @@
-name: Linux Manual Build V3
+name: Linux Manual Build
 
 on:
   workflow_dispatch:
@@ -6,37 +6,55 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: python:3.11-slim
     permissions:
       contents: write
-
+      
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
 
-    - name: Install Dependencies
+    - name: Install system dependencies
       run: |
-        apt-get update
-        apt-get install -y fakeroot dpkg-dev git
-        pip install pyinstaller
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        sudo apt-get update
+        sudo apt-get install -y fakeroot dpkg-dev
 
-    - name: Build and Package
+    - name: Install Python packages
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        fi
+
+    - name: Get version
       run: |
         VERSION=$(cat version.txt)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
-        
-        # Build executable
+        echo "Building version: $VERSION"
+
+    - name: Build with PyInstaller
+      run: |
         pyinstaller --onefile --name dotranslate translator.py
+        ls -la dist/
+
+    - name: Create Debian package
+      run: |
+        mkdir -p debian-package/DEBIAN
+        mkdir -p debian-package/usr/local/bin
         
-        # Create package
-        mkdir -p debian-package/DEBIAN debian-package/usr/local/bin
+        # Copy and set permissions
         cp dist/dotranslate debian-package/usr/local/bin/
         chmod +x debian-package/usr/local/bin/dotranslate
         
+        # Create control file
         cat > debian-package/DEBIAN/control << EOF
         Package: dotranslate
-        Version: $VERSION
+        Version: ${{ env.VERSION }}
         Section: utils
         Priority: optional
         Architecture: amd64
@@ -45,32 +63,32 @@ jobs:
          A tool for translating text using various translation services.
         EOF
         
+        # Build package
         dpkg-deb --build debian-package
-        mv debian-package.deb dotranslate_${VERSION}_amd64.deb
+        mv debian-package.deb dotranslate_${{ env.VERSION }}_amd64.deb
 
-    - name: Install GitHub CLI
+    - name: Generate checksum
       run: |
-        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-        apt update
-        apt install gh -y
+        sha256sum dotranslate_${{ env.VERSION }}_amd64.deb > SHA256SUMS
+        echo "Package checksum:"
+        cat SHA256SUMS
 
-    - name: Release
+    - name: Release to GitHub
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ github.token }}
       run: |
-        sha256sum dotranslate_${VERSION}_amd64.deb > SHA256SUMS
-        
-        # Upload files
-        gh release upload v${VERSION} \
-          dotranslate_${VERSION}_amd64.deb \
+        # Upload the package and checksum
+        gh release upload v${{ env.VERSION }} \
+          dotranslate_${{ env.VERSION }}_amd64.deb \
           SHA256SUMS \
           --clobber
         
         # Update release notes
-        gh release edit v${VERSION} --notes-append "
+        BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M:%S')
+        gh release edit v${{ env.VERSION }} --notes-append "
 
         Linux build added
-        - Build Date: $(date -u '+%Y-%m-%d %H:%M:%S')
+        - Build Date: $BUILD_DATE UTC
         - Architecture: amd64
-        - SHA256: $(cat SHA256SUMS)"
+        - SHA256: $(cat SHA256SUMS)
+        - Built by: ${{ github.actor }}"
