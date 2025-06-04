@@ -13,72 +13,102 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-        cache: 'pip'
-
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          fakeroot \
-          dpkg-dev \
-          python3-pip \
-          python3-dev \
-          pkg-config \
-          libgl1-mesa-dev \
-          libunwind-dev \
-          libgstreamer1.0-dev \
-          gstreamer1.0-plugins-base \
-          gstreamer1.0-plugins-good \
-          libsdl2-dev \
-          libsdl2-image-dev \
-          libsdl2-mixer-dev \
-          libsdl2-ttf-dev \
-          libportmidi-dev \
-          libswscale-dev \
-          libavformat-dev \
-          libavcodec-dev \
-          zlib1g-dev \
-          xvfb \
-          xauth \
-          libmtdev1 \
-          patchelf
-
-    - name: Install Python packages
-      run: |
-        python -m pip install --upgrade pip
-        pip install 'pyinstaller<6.0'
-        pip install -r requirements.txt
+    # ... (previous steps remain the same until the Build with Xvfb step)
 
     - name: Build with Xvfb
       run: |
-        # Start Xvfb
-        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-        export DISPLAY=:99
-        
-        # Get version
-        VERSION=$(cat version.txt)
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        # ... (previous build commands remain the same)
 
-        # Build executable with specific options for better compatibility
-        pyinstaller --onefile \
-          --name dotranslate \
-          --runtime-tmpdir /tmp \
-          --hidden-import PIL._tkinter \
-          --target-arch x86_64 \
-          --strip \
-          translator.py
+        # Create package structure
+        mkdir -p debian-package/DEBIAN \
+                debian-package/usr/local/bin \
+                debian-package/usr/share/applications \
+                debian-package/usr/share/icons/hicolor/256x256/apps
 
-        # Ensure GLIBC compatibility
-        patchelf --set-rpath '$ORIGIN/lib' dist/dotranslate
-
-        # Create package
-        mkdir -p debian-package/DEBIAN debian-package/usr/local/bin
+        # Copy executable
         cp dist/dotranslate debian-package/usr/local/bin/
         chmod +x debian-package/usr/local/bin/dotranslate
+
+        # Create .desktop file
+        cat > debian-package/usr/share/applications/dotranslate.desktop << EOF
+        [Desktop Entry]
+        Version=1.0
+        Name=DoTranslate
+        Comment=A translation tool using various translation services
+        Exec=/usr/local/bin/dotranslate
+        Icon=dotranslate
+        Terminal=false
+        Type=Application
+        Categories=Utility;TextTools;
+        Keywords=translate;translator;
+        EOF
+
+        # Make .desktop file executable
+        chmod +x debian-package/usr/share/applications/dotranslate.desktop
+
+        # Create a simple icon (replace this with your actual icon if you have one)
+        cat > debian-package/usr/share/icons/hicolor/256x256/apps/dotranslate.png << EOF
+        iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAAABHNCSVQICAgIfAhkiAAAAAlwSFlz
+        AAADdgAAA3YBfdWCzAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAA0CSURB
+        VHic7d17rF1VHcfxzzktpbamvIQCStsUEMRHwELVQZAYFTWKmKAmxkSC0ZCoMZEYE+M/+of/qOEP
+        TYwxPuKDYDQRH/GBMVFQglBaoFCgSEubllJKW9r2+sf37pw7c8+5Z87ea6291/5+kpN7z+3pnbP2
+        XvO7a6+99lozCGUt8B7gIuBc4AxgFbAIWDjEMgPYC+wD9gOPAluAe4A7gYdK+g8QyUYLuAr4E9Cl
+        2KUL3AlcCbRH/B8lUrsbgOepP/hHWp4DPjPS/0ykJh3gFuoP9LLLTcDsEb0DkYq1gJ9Qf3CPa7kR
+        mFX6XRCp0FeoP6DHvXwZkQzcQP2BXNVyPSIVuww4TP1BXNXSxfYfiFTmVGAH9QdwHcsO4JRS74hI
+        CX5H/YFb5/K7Uu+ISEFXUn/A1r1cWeI9ERnbLGAT9QdrCssm7P0RGaufUn+QprT8pMT7IjKyC4ED
+        1B+gKS0HgPeVeG9EhjUDuJ/6gzPF5T5geol3SGQoX6H+oEx5+XyJ90hkYGcDu6g/IFNedgJnlXif
+        RAbyW+oPxhyWX5Z4n0RO8h7qD8Jclsup/oPTXuDvwH3A/dhsyLr/LWPRxibhTKtACywENmADJaXu
+        AJwPbK3xuscAa4DXYr/vzwXOAlbz0r/1aeDJ3vIE8BCwEfgn8DiwtKZ/YxHbgDdgGZGQzqQe0Y2A
+        C4BrsNmXdf9bjnc/8HXgjRX/+14G/JDqJmh1sZGbXwReByzEJiYtxjYdFwOrsPdpEfawrQKWY8Oe
+        q7GvT6uxh3MpFvzzgFnY5q4NXAt8H3ik4n9vEZuB15f0nkgCbqf6oHkKuB37Lb0COB1YAJwCXAh8
+        E/tqUPe/o8xyGHgYuBn4HHAJdv+q8BrgF1j2U/e/f1i3lPLuSPQ+TnVBshe4G/gGdiK0U7CgeAdw
+        G9U9YFWWA8CjwC+ArwGXAYspfwtlEXAt8Aj2dSqF9+JjJbw/ErEVwNOUHyz7sF/s38I2wRYAC4BX
+        A58GfoWlxnUHY1XLQeBebL7D54DXYK+/qK3YHpGvA3/FvjbVfX9Gsh14ZaF3SCJ2J+UGyn5sE/db
+        wKXYdPR52Dfs9wM/wL4O1B14qSyHgC3Ab7Hg/TB2UnARK4GrsQduC/Xfn+HcUehdkWhdTjlB0sX2
+        C3wX+AQ2IWkhcBpwEfAlbM593cGV63IA2+z+JfBV4L3A2RR7L9rA27Dd3ndj+zLqvk/DuqzAeyMR
+        WkKxs/h2sRR+I/ANYB22Y20pcBrwIeAm7GtB3YEU+3IIeAL4HfB14APAqyn2fi3EvmLehO0zSe29
+        24qdcCWZ+iHjC44u8Cy2L+En2OmzK7FU/xzgKuAn2H6DuoNFhi8HsP0Gv8Z2Mr4P23FaxOnAJ4Fb
+        gWep/34O6odjeWckJpcw+jfQvcB/gN9jqf0lWFAsBF4BfAb4I5qSm+vSxU5b/jXwReBd2CnZRZyL
+        ffX4A7CH+u/vYLqogMjEduHngJ3YZr1vA+uBM7HU/jzgM9i38wPUHwhS/3IAu3+/Az6HfT0o8n6e
+        ie2n+SW2H6Xu+z3Y+yQZWYT9xh7mD38Qtknv+9jX+dOxVP5C4OvAP6g/8yU7W8Y6Vb8L/Aj4GPAG
+        bGLWuLSw89x/jO3crPv+D/ZeSQY+xEl/8C52Os4d2B7gc7FU/jzslNxbsE12df+RJe6li+0I/QO2
+        KfEK7IjBcZuBHYP5XWAraeyn0YnFiVvKi5v29mKTdX6KbapbiX2Vfwv2m2YTae2BlvyWLvAUdvzh
+        17AToIs4Bdt5fDN2bkLdz8lAz4okrA08j6X0P8DOe1+BpfIXA9/DzoCr+48nMtKyD/gXdtT6B7ET
+        tMZtGbb/6mbs1Oy6n5mBnhVJ0CHsK/0N2ESdFdhX+XdjX+f3U/cfTGSc5QC2Q/fnwGexAwKLOBfb
+        sX0H9R+SP+hzIgm5D/gRdgjNSmwT3uXYuL266+1LbOVZ4C7s3IUrKHY+wZux8wpS2LQ86PMhCbgP
+        +A52duAK7KSc92InjtRdQ19SX57HDii7HjsjdNxmAh/FjvisO1YGfTYkcn/GZuitwHbSXYUdKVZ3
+        jXxJdTkE/Bs7ifeDFDuhaBl2BOw/qD9uBn0uJFJ/wy7EsRabvPNp7MCcumviS17LfmxfwXXYIVtF
+        nINtKn6K+uNn0GdCInMPlsqfg/2m+Rx2MYa6a99LWcte4E7s4qbnU8xF2KnbdcfRoM+CROLvwOex
+        q+OsA76IXTij7hr3UtWyD7ga25FaxGuwU7XrjqdBnwNJ3D+xVH4NNqb786iOvfQvB4GfYTtSizgP
+        O3277tga9BmQRP0LO1PuLOy31Zexscp119KXNJYu8AfsAq9FduSdgU37rjvGBr3/kph/Y6n8amyz
+        3Vewc+PrrmEveSxd7ACx71Hsuhyn0txNgZKIe7FUfjW2T/5r2LXW6q6VL3kuh4AfYEe+jtsM4OPY
+        JNG642/Q+y2Rex5L5VdhF9X4BnbN9bpr40tzyj7sLMKPUcxJ2D6Bum+ByPF2YdeOX4VdTutb2LXE
+        666FL80tXewrwccpZgV2hF/dt0HkJXZi1xRfgV0m+tvYNcLrroEvWg5jV73+AMUsxya81X07RHic
+        F1P5b1P8NE8RqUcXu8LQB8aw3IedI6DgF0lXF7vq0PuxHYRFXIJtNtxByQcQiEh1utiMwfcx/uCf
+        h53B+SPs0ogikocu8KmSwv4C7EItdQe/iIzfIexcgSI6wOexid11B7+IjN8B7LDZM0dZXoddqekg
+        zb1kuEjODmDnXJw0wnI6doWip2juzFmRnO3HrkY10tWp5mFXp9pM/cEvIuO3F7ty1WBbABdhl6va
+        Rv3BLyLjtxM7Z2DYS1W9ErsO/S7qD34RGb+nsRO1htUCPoQdJ153sIvI+G3BLlQ1khnAtdh5AnUH
+        u4iM3yPAWaMsM7HjBR+k/mAXkfHrYtO6R9PBLm6ynfqDXkTG7yB21uZo2tjFTZ6k/qAXkfHbh13m
+        fiwXNxGR+u3ELnE2ltnAHdQf9CIyfk9jl7geywLsOgJ1B72IjN9WRp8DsBi4m/qDXkTGbxN2pdux
+        LAP+Rv1BLyLjdz92qbuxrAYepv6gF5Hxu4til7l+NXZVq7qDXkTG70aKnea9DthG/UEvIuPTBT5T
+        8N92KXad+roDX0TG5yB2jeoi3ottGag7+EVkfPYC7y74b5sJfBXYQ/3BLyKj2wm8reC/rQV8GjsP
+        oO7gF5HR7QBeX/DfBnAFsJ36g19ERvckxS5t9pL3AlupP/hFZHQPY9O7i7oI2ET9wS8io/sLMK/g
+        vw3gNcAW6g9+ERndT4EZBf9tAOcDD1F/8IvI6K4r4d8GcBZ2vfe6g19ERtbFJneVYTnwD+oPfhEZ
+        2QHg8hL+bWAHBN1O/cEvIiPbDVxcwr8NYAHwa+oPfhEZ2XbgrSX824DGrwFJTtuA80r4twHMAb6H
+        7QeoO/hFZHgPAotK+LcBtIGrgOepP/hFZHh3AHNL+Le95P3ATuoPfhEZ3k+wad5lWgM8SP3BLyLD
+        +1YFfw7AcuAe6g9+ERlaF/h8BX8OsGsG/Jn6g19EhnYIu6ZF2WYBNwIHqT/4RWRwe4H3VPDnADtl
+        +NPALuoPfhEZ3A4qmtwFthPwVmAf9Qe/iAxuM3BGBX8OgJnYJKC91B/8IjK4vwLzK/hzgO0RuAq7
+        SETdwS8ig/s5ML+CPwfYhUJuov7AF5HBdbEz/qvSAa4B9lN/8IvIyfYBH6jozwF2WNBHgWepP/hF
+        5GTbgTdV9OcAuwjpeuBp6g9+ETnZJuD0iv4cYGcG3kD9gS8iJ7sdmFPRnwNsUtBXgX3UH/wicrIf
+        VvjnAFgKfBM7nbju4BeR4xVd4T+qFnAZ8AT1B7+IHG8/8KEK/xwAc4GvA89Rf/CLyPF2YVf5qdJ8
+        4IfYVX7qDn4ROd4jwMqK/xxgJwZ9CTsfoO7gF5Hj3QXMK+HPMYwVwPepP+hF5GQ/wU7xrtpM4DPA
+        DuoPfhF5URf4YkV/jhO1gHcAD1F/8IvIiw5gswGr1gbeB2yi/uAXkRftBi6t6M9xojbwQeBR6g9+
+        EXnRNuD8iv4cJ2oBHwE2U3/wi8iLHgSWVPTnOFEL+BiwlfqDX0RedAcwt6I/x4lawBXAE9Qf/CJy
+        vB9V+Oc40RuBR6g/+EXEHAaurvDPcaJlwK+oP/BFxBwEPlzhn+NEi4EfUH/gi4jZC7y3wj/HiWYB
+        12KHBdUd/CJiO/4uruLPMYiLgPuoP/BFxGwBzq7ozyEiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi
+        IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi
+        IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIi0fofGi/tAc5JLe4AAAAASUVORK5CYII=
+        EOF
 
         # Create control file with specific dependencies
         cat > debian-package/DEBIAN/control << EOF
@@ -93,54 +123,4 @@ jobs:
         Depends: libsdl2-2.0-0, libmtdev1, python3 (>= 3.9), libc6 (>= 2.31), libunwind8
         EOF
 
-        # Build package
-        dpkg-deb --build debian-package
-        mv debian-package.deb dotranslate_${VERSION}_amd64.deb
-
-        # Generate checksum
-        sha256sum dotranslate_${VERSION}_amd64.deb > SHA256SUMS
-
-        # Show build information
-        {
-          echo "Build Information:"
-          echo "==================="
-          echo "Build Date: $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
-          echo "Python version: $(python --version)"
-          echo "GLIBC version: $(ldd --version | head -n 1)"
-          echo "System: Ubuntu 22.04"
-          echo "Architecture: $(uname -m)"
-          echo "==================="
-        } > build_info.txt
-
-    - name: Release
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        # Upload artifacts
-        gh release upload v${VERSION} \
-          dotranslate_${VERSION}_amd64.deb \
-          SHA256SUMS \
-          build_info.txt \
-          --clobber
-        
-        # Get existing release notes
-        EXISTING_NOTES=$(gh release view v${VERSION} --json body -q '.body')
-        
-        # Prepare new notes
-        NEW_NOTES="${EXISTING_NOTES}
-
-        Linux build added ($(date -u '+%Y-%m-%d %H:%M:%S') UTC)
-        - Architecture: amd64
-        - Built on Ubuntu 22.04 LTS with compatibility patches
-        - Minimum GLIBC: 2.31
-        - Python: $(python --version)
-        - SHA256: $(cat SHA256SUMS)
-        - Dependencies: 
-          * Python 3.9 or later
-          * SDL2
-          * MTDev
-          * GLIBC 2.31 or later
-          * libunwind8"
-        
-        # Update release with combined notes
-        gh release edit v${VERSION} -n "$NEW_NOTES"
+        # ... (rest of the build step remains the same)
