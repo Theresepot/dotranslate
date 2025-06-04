@@ -5,7 +5,6 @@ on:
 
 jobs:
   build:
-    # Using Ubuntu 22.04 with specific compatibility settings
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -30,6 +29,7 @@ jobs:
           python3-dev \
           pkg-config \
           libgl1-mesa-dev \
+          libunwind-dev \
           libgstreamer1.0-dev \
           gstreamer1.0-plugins-base \
           gstreamer1.0-plugins-good \
@@ -90,7 +90,7 @@ jobs:
         Maintainer: Theresepot
         Description: DoTranslate - A translation tool
          A tool for translating text using various translation services.
-        Depends: libsdl2-2.0-0, libmtdev1, python3 (>= 3.9), libc6 (>= 2.31)
+        Depends: libsdl2-2.0-0, libmtdev1, python3 (>= 3.9), libc6 (>= 2.31), libunwind8
         EOF
 
         # Build package
@@ -139,7 +139,8 @@ jobs:
           * Python 3.9 or later
           * SDL2
           * MTDev
-          * GLIBC 2.31 or later"
+          * GLIBC 2.31 or later
+          * libunwind8"
         
         # Update release with combined notes
         gh release edit v${VERSION} -n "$NEW_NOTES"
