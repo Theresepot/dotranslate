@@ -5,7 +5,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Using Ubuntu 20.04 for better compatibility with older GLIBC versions
+    runs-on: ubuntu-20.04
     permissions:
       contents: write
       
@@ -61,15 +62,19 @@ jobs:
         VERSION=$(cat version.txt)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-        # Build executable
-        pyinstaller --onefile --name dotranslate translator.py
+        # Build executable with specific options for better compatibility
+        pyinstaller --onefile \
+          --name dotranslate \
+          --runtime-tmpdir /tmp \
+          --hidden-import PIL._tkinter \
+          translator.py
 
         # Create package
         mkdir -p debian-package/DEBIAN debian-package/usr/local/bin
         cp dist/dotranslate debian-package/usr/local/bin/
         chmod +x debian-package/usr/local/bin/dotranslate
 
-        # Create control file
+        # Create control file with specific dependencies
         cat > debian-package/DEBIAN/control << EOF
         Package: dotranslate
         Version: $VERSION
@@ -79,7 +84,7 @@ jobs:
         Maintainer: Theresepot
         Description: DoTranslate - A translation tool
          A tool for translating text using various translation services.
-        Depends: libsdl2-2.0-0, libmtdev1, python3
+        Depends: libsdl2-2.0-0, libmtdev1, python3 (>= 3.9), libc6 (>= 2.31)
         EOF
 
         # Build package
@@ -89,12 +94,21 @@ jobs:
         # Generate checksum
         sha256sum dotranslate_${VERSION}_amd64.deb > SHA256SUMS
 
+        # Show GLIBC version used
+        ldd --version >> build_info.txt
+        echo "Python version:" >> build_info.txt
+        python --version >> build_info.txt
+
     - name: Release
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         # Upload artifacts
-        gh release upload v${VERSION} dotranslate_${VERSION}_amd64.deb SHA256SUMS --clobber
+        gh release upload v${VERSION} \
+          dotranslate_${VERSION}_amd64.deb \
+          SHA256SUMS \
+          build_info.txt \
+          --clobber
         
         # Get existing release notes
         EXISTING_NOTES=$(gh release view v${VERSION} --json body -q '.body')
@@ -102,11 +116,17 @@ jobs:
         # Prepare new notes
         NEW_NOTES="${EXISTING_NOTES}
 
-        Linux build added
-        - Build Date: $(date -u '+%Y-%m-%d %H:%M:%S') UTC
+        Linux build added ($(date -u '+%Y-%m-%d %H:%M:%S') UTC)
         - Architecture: amd64
+        - Built on Ubuntu 20.04 LTS
+        - Minimum GLIBC: 2.31
+        - Python: $(python --version)
         - SHA256: $(cat SHA256SUMS)
-        - Dependencies: SDL2, MTDev, Python3"
+        - Dependencies: 
+          * Python 3.9 or later
+          * SDL2
+          * MTDev
+          * GLIBC 2.31 or later"
         
         # Update release with combined notes
         gh release edit v${VERSION} -n "$NEW_NOTES"
