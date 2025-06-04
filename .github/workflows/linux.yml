@@ -5,8 +5,8 @@ on:
 
 jobs:
   build:
-    # Using Ubuntu 20.04 for better compatibility with older GLIBC versions
-    runs-on: ubuntu-20.04
+    # Using Ubuntu 22.04 with specific compatibility settings
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
       
@@ -44,7 +44,8 @@ jobs:
           zlib1g-dev \
           xvfb \
           xauth \
-          libmtdev1
+          libmtdev1 \
+          patchelf
 
     - name: Install Python packages
       run: |
@@ -67,7 +68,12 @@ jobs:
           --name dotranslate \
           --runtime-tmpdir /tmp \
           --hidden-import PIL._tkinter \
+          --target-arch x86_64 \
+          --strip \
           translator.py
+
+        # Ensure GLIBC compatibility
+        patchelf --set-rpath '$ORIGIN/lib' dist/dotranslate
 
         # Create package
         mkdir -p debian-package/DEBIAN debian-package/usr/local/bin
@@ -94,10 +100,17 @@ jobs:
         # Generate checksum
         sha256sum dotranslate_${VERSION}_amd64.deb > SHA256SUMS
 
-        # Show GLIBC version used
-        ldd --version >> build_info.txt
-        echo "Python version:" >> build_info.txt
-        python --version >> build_info.txt
+        # Show build information
+        {
+          echo "Build Information:"
+          echo "==================="
+          echo "Build Date: $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
+          echo "Python version: $(python --version)"
+          echo "GLIBC version: $(ldd --version | head -n 1)"
+          echo "System: Ubuntu 22.04"
+          echo "Architecture: $(uname -m)"
+          echo "==================="
+        } > build_info.txt
 
     - name: Release
       env:
@@ -118,7 +131,7 @@ jobs:
 
         Linux build added ($(date -u '+%Y-%m-%d %H:%M:%S') UTC)
         - Architecture: amd64
-        - Built on Ubuntu 20.04 LTS
+        - Built on Ubuntu 22.04 LTS with compatibility patches
         - Minimum GLIBC: 2.31
         - Python: $(python --version)
         - SHA256: $(cat SHA256SUMS)
