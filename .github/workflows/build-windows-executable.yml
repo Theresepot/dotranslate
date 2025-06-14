@@ -62,6 +62,15 @@ jobs:
       - name: Install Tesseract OCR
         run: choco install tesseract -y
 
+      - name: Find tessdata directory
+        id: find_tessdata
+        shell: pwsh
+        run: |
+          $tessdata = Get-ChildItem -Path 'C:\' -Recurse -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'tessdata' } | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $tessdata) { Write-Error 'tessdata directory not found!'; exit 1 }
+          echo "TESSDATA_PATH=$tessdata" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "Found tessdata at $tessdata"
+
       - name: Create Kivy config
         run: |
           echo "[graphics]" > kivy_config.ini
@@ -71,7 +80,7 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --windowed --add-data "C:\ProgramData\chocolatey\lib\tesseract\tools\tesseract-ocr\tessdata;tessdata" --add-data "kivy_config.ini;." translator.py
+          pyinstaller --onefile --windowed --add-data "$env:TESSDATA_PATH;tessdata" --add-data "kivy_config.ini;." translator.py
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
