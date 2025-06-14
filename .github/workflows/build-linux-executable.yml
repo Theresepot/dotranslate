@@ -6,12 +6,6 @@ permissions:
   actions: write
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - '**.py'
-      - 'version.txt'
-      - '.github/workflows/**'
   workflow_dispatch:
 
 jobs:
