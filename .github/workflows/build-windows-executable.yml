@@ -84,9 +84,20 @@ jobs:
           $env:KIVY_WINDOW = 'mock'
           pyinstaller --onefile --windowed --add-data "$env:TESSDATA_PATH;tessdata" --add-data "kivy_config.ini;." translator.py
 
+      - name: Create or update tag
+        shell: pwsh
+        run: |
+          $version = (Get-Content version.txt).Trim()
+          $tag = "v$version"
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
+          if (-not (git tag | Select-String $tag)) {
+            git tag $tag
+            git push origin $tag
+          }
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: dist/translator.exe
           tag_name: v${{ env.VERSION }}
@@ -96,6 +107,7 @@ jobs:
             
             Changes in this version:
             - See commit history for details
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
