@@ -9,7 +9,7 @@ block_cipher = None
 kivy_data_dir = os.path.join(os.path.dirname('__file__'), 'kivy_install', 'data')
 
 a = Analysis(
-    ['no_window.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
     datas=[
