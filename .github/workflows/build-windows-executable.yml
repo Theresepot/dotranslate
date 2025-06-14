@@ -60,20 +60,30 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Install Tesseract
-        shell: bash
         run: |
-          # Download Tesseract installer
-          curl -L "https://github.com/UB-Mannheim/tesseract/releases/download/v5.3.1.20230401/tesseract-ocr-w64-setup-5.3.1.20230401.exe" -o tesseract-installer.exe
+          # Create a temporary directory for Tesseract
+          mkdir tesseract-temp
+          cd tesseract-temp
           
-          # Install Tesseract silently
-          ./tesseract-installer.exe /S
+          # Download Tesseract installer using PowerShell
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri "https://github.com/UB-Mannheim/tesseract/releases/download/v5.3.1.20230401/tesseract-ocr-w64-setup-5.3.1.20230401.exe" -OutFile "tesseract-installer.exe"
+          
+          # Install Tesseract
+          Start-Process -FilePath ".\tesseract-installer.exe" -ArgumentList "/S" -Wait
           
           # Add Tesseract to PATH
-          echo "C:\Program Files\Tesseract-OCR" >> $GITHUB_PATH
+          $env:Path = "$env:Path;C:\Program Files\Tesseract-OCR"
           
           # Verify installation
-          echo "Tesseract version:"
-          "C:\Program Files\Tesseract-OCR\tesseract.exe" --version
+          Write-Host "Tesseract version:"
+          & "C:\Program Files\Tesseract-OCR\tesseract.exe" --version
+          
+          # Create tessdata directory in the project
+          mkdir ..\tessdata
+          Copy-Item "C:\Program Files\Tesseract-OCR\tessdata\*" ..\tessdata\ -Recurse
+          
+          cd ..
 
       - name: Create Kivy config
         run: |
@@ -84,7 +94,7 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --windowed --add-data "C:\Program Files\Tesseract-OCR\tessdata;tessdata" --add-data "kivy_config.ini;." translator.py
+          pyinstaller --onefile --windowed --add-data "tessdata;tessdata" --add-data "kivy_config.ini;." translator.py
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
