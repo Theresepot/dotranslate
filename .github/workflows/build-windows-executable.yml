@@ -82,7 +82,7 @@ jobs:
         shell: pwsh
         run: |
           $env:KIVY_WINDOW = 'mock'
-          pyinstaller --onefile --windowed --add-data "$env:TESSDATA_PATH;tessdata" --add-data "kivy_config.ini;." main.py
+          pyinstaller --onefile --windowed --add-data "$env:TESSDATA_PATH;tessdata" --add-data "kivy_config.ini;." .github/workflows/translator.spec
 
       - name: Create or update tag
         shell: pwsh
