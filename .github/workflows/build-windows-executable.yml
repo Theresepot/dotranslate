@@ -59,15 +59,11 @@ jobs:
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
-      - name: Download Tesseract
-        run: |
-          Invoke-WebRequest -Uri "https://github.com/UB-Mannheim/tesseract/releases/download/v5.3.1.20230401/tesseract-ocr-w64-setup-5.3.1.20230401.exe" -OutFile "tesseract-installer.exe"
-          Start-Process -FilePath "tesseract-installer.exe" -ArgumentList "/S" -Wait
-
-      - name: Add Tesseract to PATH
-        run: |
-          $env:Path += ";C:\Program Files\Tesseract-OCR"
-          [Environment]::SetEnvironmentVariable("Path", $env:Path, [System.EnvironmentVariableTarget]::Machine)
+      - name: Install Tesseract
+        uses: UB-Mannheim/setup-tesseract@v1
+        with:
+          tesseract-version: 5.3.1
+          install-path: C:\Program Files\Tesseract-OCR
 
       - name: Create Kivy config
         run: |

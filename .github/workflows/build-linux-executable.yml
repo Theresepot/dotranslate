@@ -74,9 +74,16 @@ jobs:
           echo "window_icon = " >> kivy_config.ini
           echo "exit_on_escape = 1" >> kivy_config.ini
 
+      - name: Find Tesseract data path
+        id: tesseract_path
+        run: |
+          TESSDATA_PATH=$(find /usr -name "tessdata" -type d | head -n 1)
+          echo "TESSDATA_PATH=$TESSDATA_PATH" >> $GITHUB_ENV
+          echo "Found Tesseract data at: $TESSDATA_PATH"
+
       - name: Build executable
         run: |
-          pyinstaller --onefile --windowed --add-data "/usr/share/tesseract-ocr/4.00/tessdata:tessdata" --add-data "kivy_config.ini:." translator.py
+          pyinstaller --onefile --windowed --add-data "$TESSDATA_PATH:tessdata" --add-data "kivy_config.ini:." translator.py
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
