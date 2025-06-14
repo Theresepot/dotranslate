@@ -22,7 +22,7 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       
       - name: Get version
         id: get_version
@@ -32,7 +32,7 @@ jobs:
           echo "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.8'
 
@@ -96,7 +96,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: windows-executable-v${{ env.VERSION }}
           path: dist/translator.exe
