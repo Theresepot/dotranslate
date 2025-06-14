@@ -15,15 +15,16 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build-windows-executable:
-    runs-on: windows-2022
+    runs-on: windows-latest
     timeout-minutes: 15
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Get version
         id: get_version
@@ -34,40 +35,36 @@ jobs:
           echo "Version from file: $version"
 
       - name: Set up Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v2
         with:
-          python-version: '3.11'
-          architecture: 'x64'
+          python-version: '3.8'
 
       - name: Install dependencies
-        shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          pip install wheel setuptools
-          
-          # Install Kivy dependencies
-          pip install kivy_deps.sdl2==0.6.0
-          pip install kivy_deps.glew==0.3.1
-          pip install kivy_deps.angle==0.3.3
-          
-          # Force Kivy to use ANGLE instead of OpenGL
-          $env:KIVY_GL_BACKEND = "angle_sdl2"
-          pip install kivy==2.2.1
-          
-          # Install other dependencies
-          pip install requests==2.31.0
-          pip install pyinstaller==6.3.0
-          pip install pytesseract==0.3.10
-          pip install Pillow==10.2.0
-          pip install PyPDF2==3.0.1
-          pip install --no-deps PyDictionary
-          pip install goslate --no-deps
-          pip install beautifulsoup4
+          pip install pyinstaller
+          pip install kivy
+          pip install requests
+          pip install pytesseract
+          pip install Pillow
+          pip install PyPDF2
+          pip install PyDictionary
+          pip install nltk
+          pip install no-window
 
-      - name: Install Tesseract
-        shell: pwsh
+      - name: Download Tesseract
         run: |
-          choco install tesseract -y
+          Invoke-WebRequest -Uri "https://github.com/UB-Mannheim/tesseract/releases/download/v5.3.1.20230401/tesseract-ocr-w64-setup-5.3.1.20230401.exe" -OutFile "tesseract-installer.exe"
+          Start-Process -FilePath "tesseract-installer.exe" -ArgumentList "/S" -Wait
+
+      - name: Add Tesseract to PATH
+        run: |
+          $env:Path += ";C:\Program Files\Tesseract-OCR"
+          [Environment]::SetEnvironmentVariable("Path", $env:Path, [System.EnvironmentVariableTarget]::Machine)
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --windowed --add-data "C:\Program Files\Tesseract-OCR\tessdata;tessdata" translator.py
 
       - name: Create no_window.py
         shell: pwsh
