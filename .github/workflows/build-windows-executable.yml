@@ -60,24 +60,20 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Install Tesseract
+        shell: bash
         run: |
-          $tesseractUrl = "https://github.com/UB-Mannheim/tesseract/releases/download/v5.3.1.20230401/tesseract-ocr-w64-setup-5.3.1.20230401.exe"
-          $installerPath = "tesseract-installer.exe"
-          $tesseractPath = "C:\Program Files\Tesseract-OCR"
-          
           # Download Tesseract installer
-          Invoke-WebRequest -Uri $tesseractUrl -OutFile $installerPath
+          curl -L "https://github.com/UB-Mannheim/tesseract/releases/download/v5.3.1.20230401/tesseract-ocr-w64-setup-5.3.1.20230401.exe" -o tesseract-installer.exe
           
           # Install Tesseract silently
-          Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
+          ./tesseract-installer.exe /S
           
           # Add Tesseract to PATH
-          $env:Path = "$env:Path;$tesseractPath"
-          [Environment]::SetEnvironmentVariable("Path", $env:Path, [System.EnvironmentVariableTarget]::Machine)
+          echo "C:\Program Files\Tesseract-OCR" >> $GITHUB_PATH
           
           # Verify installation
-          Write-Host "Tesseract version:"
-          & "$tesseractPath\tesseract.exe" --version
+          echo "Tesseract version:"
+          "C:\Program Files\Tesseract-OCR\tesseract.exe" --version
 
       - name: Create Kivy config
         run: |
