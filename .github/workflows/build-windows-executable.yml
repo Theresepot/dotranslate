@@ -79,7 +79,9 @@ jobs:
           echo "exit_on_escape = 1" >> kivy_config.ini
 
       - name: Build executable
+        shell: pwsh
         run: |
+          $env:KIVY_WINDOW = 'mock'
           pyinstaller --onefile --windowed --add-data "$env:TESSDATA_PATH;tessdata" --add-data "kivy_config.ini;." translator.py
 
       - name: Create Release
