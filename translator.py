@@ -1,6 +1,30 @@
 import os
-os.environ['KIVY_WINDOW'] = 'sdl2'
-os.environ['KIVY_GL_BACKEND'] = 'angle_sdl2'
+import sys
+# Remove unconditional KIVY_GL_BACKEND=angle_sdl2 (handled in main.py)
+# Only set KIVY_WINDOW=sdl2 if not already set
+if 'KIVY_WINDOW' not in os.environ:
+    os.environ['KIVY_WINDOW'] = 'sdl2'
+
+def find_tessdata_dir():
+    if sys.platform.startswith('win'):
+        possible = [
+            r'C:\\Program Files\\Tesseract-OCR\\tessdata',
+            r'C:\\Program Files (x86)\\Tesseract-OCR\\tessdata',
+        ]
+        for p in possible:
+            if os.path.isdir(p):
+                return p
+    else:
+        for p in [
+            '/usr/share/tesseract-ocr/5/tessdata',
+            '/usr/share/tesseract-ocr/4.00/tessdata',
+            '/usr/share/tesseract-ocr/tessdata',
+        ]:
+            if os.path.isdir(p):
+                return p
+    return None
+
+TESSDATA_DIR = os.environ.get('TESSDATA_PREFIX') or find_tessdata_dir()
 
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
@@ -167,31 +191,29 @@ class TranslationApp(App):
     def extract_text_from_image(self, image_path):
         try:
             image = Image.open(image_path)
-            
-            # Determine the language for OCR based on source language
             lang_codes = {
                 'English': 'eng',
-                'Chinese': 'chi_sim+chi_tra',  # Use both simplified and traditional Chinese
+                'Chinese': 'chi_sim+chi_tra',
                 'Russian': 'rus',
                 'German': 'deu',
                 'French': 'fra',
                 'Spanish': 'spa',
                 'Italian': 'ita'
             }
-            
-            # Get the source language from the spinner
             source_lang = self.title_bar.source_lang.text
             lang = lang_codes.get(source_lang, 'eng')
-            
-            # Configure tesseract parameters for better accuracy
-            custom_config = f'-l {lang} --psm 3'
-            
-            # Preprocess image for better OCR
-            # Convert to RGB if image is in RGBA
+            # --- Always pass tessdata-dir ---
+            if not TESSDATA_DIR:
+                raise Exception('Tesseract tessdata directory not found. Please install Tesseract and language packs.')
+            # Check if all required .traineddata files exist
+            for l in lang.split('+'):
+                traineddata = os.path.join(TESSDATA_DIR, f'{l}.traineddata')
+                if not os.path.isfile(traineddata):
+                    raise Exception(f"Tesseract language data '{l}.traineddata' not found in {TESSDATA_DIR}. Please install the required language pack.")
+            tessdata_config = f'--tessdata-dir "{TESSDATA_DIR}" -l {lang} --psm 3'
             if image.mode == 'RGBA':
                 image = image.convert('RGB')
-            
-            text = pytesseract.image_to_string(image, config=custom_config)
+            text = pytesseract.image_to_string(image, config=tessdata_config)
             return text.strip()
         except Exception as e:
             raise Exception(f"Error extracting text from image: {str(e)}")
@@ -220,14 +242,16 @@ class TranslationApp(App):
         main_layout.add_widget(self.title_bar)
         
         # Text input area
-        self.input_text = TextInput(
+        input_kwargs = dict(
             multiline=True,
             hint_text='Enter text to translate...',
             size_hint_y=0.4,  # Take 40% of available height
-            font_name=self.font_path if self.font_path else '',
             font_size=16,
             allow_copy=True
         )
+        if self.font_path:
+            input_kwargs['font_name'] = self.font_path
+        self.input_text = TextInput(**input_kwargs)
         
         # Translation engine selection and buttons
         engine_layout = BoxLayout(
@@ -306,15 +330,17 @@ class TranslationApp(App):
         # Remove extra flexible spaces
         
         # Result text area
-        self.result_text = TextInput(
+        result_kwargs = dict(
             multiline=True,
             readonly=True,
             hint_text='Translation will appear here...',
             size_hint_y=0.4,  # Take 40% of available height
-            font_name=self.font_path if self.font_path else '',
             font_size=16,
             allow_copy=True
         )
+        if self.font_path:
+            result_kwargs['font_name'] = self.font_path
+        self.result_text = TextInput(**result_kwargs)
         
         # Add all widgets to main layout
         main_layout.add_widget(self.input_text)

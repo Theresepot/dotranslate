@@ -129,6 +129,37 @@ By default, Tesseract on Windows comes with English. For other languages (Chines
 
 ---
 
+### Universal Troubleshooting (Linux & Windows)
+
+#### Tesseract Language Data Not Found
+If you see errors like:
+
+    Error opening data file .../tessdata/rus.traineddata ... Please make sure the TESSDATA_PREFIX environment variable is set to your "tessdata" directory.
+
+- The app now **auto-detects** the tessdata directory and always passes it to Tesseract.
+- If you still get this error:
+  1. Make sure the required `.traineddata` files (e.g., `rus.traineddata`, `chi_sim.traineddata`) are present in your tessdata folder.
+     - On **Linux**: `/usr/share/tesseract-ocr/5/tessdata` or `/usr/share/tesseract-ocr/4.00/tessdata`
+     - On **Windows**: `C:\Program Files\Tesseract-OCR\tessdata`
+  2. If missing, download from [tessdata repository](https://github.com/tesseract-ocr/tessdata) and place in the tessdata folder.
+  3. The app will show a clear error if a required language file is missing.
+
+#### Kivy Window Provider / OpenGL Backend Error (Linux)
+If you see errors like:
+
+    Unable to find any valuable Window provider... sdl2 - Exception: CGL: ANGLE backend can be used only on Windows
+
+- The app now only sets the ANGLE backend on Windows. On Linux, it uses the default OpenGL backend.
+- If you still have issues, ensure you have the following packages installed:
+  - `libsdl2-dev`, `libsdl2-image-dev`, `libsdl2-mixer-dev`, `libsdl2-ttf-dev`, `libgl1-mesa-glx`, `libgl1-mesa-dri`
+- You can also try running:
+
+      sudo apt-get install libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libgl1-mesa-glx libgl1-mesa-dri
+
+- If running in a headless environment (no display), Kivy will not work unless you use a virtual framebuffer (Xvfb).
+
+---
+
 ## Why Use dotranslate?
 - **Works with images and PDFs**: Extract text from files locally, even when offline
 - **No vendor lock-in**: Choose your preferred translation engine
