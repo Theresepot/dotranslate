@@ -82,7 +82,7 @@ jobs:
         shell: pwsh
         run: |
           $env:KIVY_WINDOW = 'mock'
-          pyinstaller translator.spec
+          pyinstaller --onefile --windowed --name translator main.py
 
       - name: Create or update tag
         shell: pwsh
