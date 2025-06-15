@@ -9,11 +9,11 @@ block_cipher = None
 kivy_data_dir = os.path.join(os.path.dirname('__file__'), 'kivy_install', 'data')
 
 a = Analysis(
-    ['../main.py'],
-    pathex=['../../'],
+    ['main.py'],
+    pathex=['.'],
     binaries=[],
     datas=[
-        ('../../translator.py', '.'),
+        ('translator.py', '.'),
         # (os.path.join(HOMEPATH, 'PyInstaller', 'hooks'), 'PyInstaller/hooks')
     ],
     hiddenimports=[
@@ -77,4 +77,4 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name='translator'
-)
+) 
