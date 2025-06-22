@@ -1,54 +1,54 @@
 import os
 import sys
+import io
 
-# Set Kivy environment variables for cross-platform compatibility
-os.environ['KIVY_WINDOW'] = 'sdl2'
+# --- Environment Setup for Kivy ---
+
+# 1. Set Kivy window and graphics backend to solve issues on some systems.
+#    This must be done *before* any Kivy modules are imported.
 if sys.platform.startswith('win'):
+    # Use ANGLE for DirectX compatibility to avoid OpenGL errors in VMs
     os.environ['KIVY_GL_BACKEND'] = 'angle_sdl2'
-else:
-    # On Linux, let Kivy auto-detect or use 'gl' (default)
-    os.environ.pop('KIVY_GL_BACKEND', None)
 
-# --- Universal tessdata auto-detection ---
-def find_tessdata_dir():
-    if sys.platform.startswith('win'):
-        # Try common Windows install locations
-        possible = [
-            r'C:\Program Files\Tesseract-OCR\tessdata',
-            r'C:\Program Files (x86)\Tesseract-OCR\tessdata',
-        ]
-        for p in possible:
-            if os.path.isdir(p):
-                return p
-    else:
-        # Linux
-        for p in [
-            '/usr/share/tesseract-ocr/5/tessdata',
-            '/usr/share/tesseract-ocr/4.00/tessdata',
-            '/usr/share/tesseract-ocr/tessdata',
-        ]:
-            if os.path.isdir(p):
-                return p
-    return None
+# 2. Set the window provider. 'sdl2' is standard and required by the backend.
+if 'KIVY_WINDOW' not in os.environ:
+    os.environ['KIVY_WINDOW'] = 'sdl2'
 
-TESSDATA_DIR = find_tessdata_dir()
-if TESSDATA_DIR:
-    os.environ['TESSDATA_PREFIX'] = TESSDATA_DIR
+# 3. Redirect stdout and stderr for PyInstaller windowed apps on Windows.
+#    This prevents the app from crashing if it tries to print to a non-existent console.
+#    This is a common issue with apps built with --noconsole or --windowed.
+if sys.platform.startswith('win') and getattr(sys, 'frozen', False):
+    if sys.stdout is None:
+        sys.stdout = io.StringIO()
+    if sys.stderr is None:
+        sys.stderr = io.StringIO()
 
-# Ensure sys.stdout and sys.stderr are not None (important for --windowed PyInstaller)
-class DummyStream:
-    def write(self, *args, **kwargs):
-        pass
-    def flush(self):
-        pass
+# --- Main Application Execution ---
 
-if sys.stdout is None:
-    sys.stdout = DummyStream()
-if sys.stderr is None:
-    sys.stderr = DummyStream()
+# Now that the environment is properly configured, we can safely import and run the app.
+try:
+    from translator import TranslationApp
 
-# Now import and run the app
-from translator import TranslationApp
+    if __name__ == '__main__':
+        # The 'frozen' attribute is set by PyInstaller when running as a bundled .exe
+        is_frozen = getattr(sys, 'frozen', False)
+        print(f"Running application... (Frozen: {is_frozen})")
+        print(f"Platform: {sys.platform}")
 
-if __name__ == '__main__':
-    TranslationApp().run() 
+        if sys.platform.startswith('win'):
+            print(f"KIVY_GL_BACKEND = {os.environ.get('KIVY_GL_BACKEND')}")
+            print(f"KIVY_WINDOW = {os.environ.get('KIVY_WINDOW')}")
+
+        TranslationApp().run()
+
+except Exception as e:
+    # If a crash occurs on startup, log it to a file for easier debugging.
+    # This is especially useful for tracking down issues in the bundled .exe.
+    with open("error.log", "w", encoding="utf-8") as f:
+        f.write("A critical error occurred during application startup:\n\n")
+        f.write(str(e) + "\n\n")
+        import traceback
+        traceback.print_exc(file=f)
+
+    # Also, print the error if a console is available.
+    print(f"A critical error occurred. See error.log for details: {e}") 

@@ -1,9 +1,5 @@
 import os
 import sys
-# Remove unconditional KIVY_GL_BACKEND=angle_sdl2 (handled in main.py)
-# Only set KIVY_WINDOW=sdl2 if not already set
-if 'KIVY_WINDOW' not in os.environ:
-    os.environ['KIVY_WINDOW'] = 'sdl2'
 
 def find_tessdata_dir():
     if sys.platform.startswith('win'):
@@ -544,6 +540,3 @@ class TranslationApp(App):
             return '\n'.join(thesaurus_lines)
         else:
             return f"Thesaurus for '{word}' ({lang.title()}):\nNo synonyms found.\nNo antonyms found.\n(Thesaurus is only available for English or when supported by the translation API.)"
-
-if __name__ == '__main__':
-    TranslationApp().run()
