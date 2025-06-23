@@ -1,5 +1,6 @@
 import os
 import sys
+from PyDictionary import PyDictionary
 
 def find_tessdata_dir():
     if sys.platform.startswith('win'):
@@ -22,6 +23,9 @@ def find_tessdata_dir():
 
 TESSDATA_DIR = os.environ.get('TESSDATA_PREFIX') or find_tessdata_dir()
 
+class TranslationApp:
+    def __init__(self, **kwargs):
+        # Import Kivy modules only when the app is instantiated
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -39,83 +43,25 @@ from kivy.uix.filechooser import FileChooserListView
 from kivy.uix.popup import Popup
 from kivy.uix.widget import Widget
 from kivy.properties import ObjectProperty
-import requests
-import json
-import pytesseract
-from PIL import Image
-import PyPDF2
-import io
-import re
-from PyDictionary import PyDictionary
-import nltk
-
-MAX_CHARS = 1000  # Maximum characters per API request (adjust as needed)
-
 # Configure keyboard shortcuts
 Config.set('kivy', 'exit_on_escape', '0')
-
-class CustomTitleBar(BoxLayout):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.orientation = 'horizontal'
-        self.size_hint_y = None
-        self.height = dp(50)  # Fixed height for title bar
-        self.padding = [10, 5]
-        self.spacing = 10
-        
-        # Create a container for the language controls that will center them vertically
-        self.language_container = BoxLayout(
-            orientation='horizontal',
-            size_hint=(None, None),  # Fixed size
-            height=dp(40),  # Fixed height for controls
-            width=dp(300),  # Fixed width for the container
-            spacing=10,
-            pos_hint={'center_y': 0.5}  # Center vertically
-        )
-        
-        # Source language spinner with fixed size
-        self.source_lang = Spinner(
-            text='English',
-            values=('English', 'Spanish', 'French', 'German', 'Russian', 'Chinese', 'Italian'),
-            size_hint=(None, None),
-            size=(dp(100), dp(40)),
-            pos_hint={'center_y': 0.5}
-        )
-        
-        # Swap languages button with fixed size
-        self.swap_btn = Button(
-            text='⇄',
-            size_hint=(None, None),
-            size=(dp(44), dp(40)),
-            pos_hint={'center_y': 0.5}
-        )
-        
-        # Target language spinner with fixed size
-        self.target_lang = Spinner(
-            text='Spanish',
-            values=('English', 'Spanish', 'French', 'German', 'Russian', 'Chinese', 'Italian'),
-            size_hint=(None, None),
-            size=(dp(100), dp(40)),
-            pos_hint={'center_y': 0.5}
-        )
-        
-        # Add widgets to language container
-        self.language_container.add_widget(self.source_lang)
-        self.language_container.add_widget(self.swap_btn)
-        self.language_container.add_widget(self.target_lang)
-        
-        # Create a container that will center the language_container horizontally
-        center_container = BoxLayout(orientation='horizontal')
-        center_container.add_widget(Widget())  # Flexible space on the left
-        center_container.add_widget(self.language_container)
-        center_container.add_widget(Widget())  # Flexible space on the right
-        
-        # Add the centered container to the title bar
-        self.add_widget(center_container)
-
-class TranslationApp(App):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        # Assign imported classes to self for use in methods
+        self.App = App
+        self.BoxLayout = BoxLayout
+        self.Button = Button
+        self.TextInput = TextInput
+        self.Label = Label
+        self.Spinner = Spinner
+        self.ScrollView = ScrollView
+        self.Window = Window
+        self.GridLayout = GridLayout
+        self.dp = dp
+        self.Clipboard = Clipboard
+        self.CoreLabel = CoreLabel
+        self.FileChooserListView = FileChooserListView
+        self.Popup = Popup
+        self.Widget = Widget
+        self.ObjectProperty = ObjectProperty
         self.font_path = self._find_font()
         self.file_chooser = None
         self.popup = None
@@ -141,16 +87,16 @@ class TranslationApp(App):
         return None
     
     def show_file_chooser(self, instance):
-        content = BoxLayout(orientation='vertical')
-        self.file_chooser = FileChooserListView(
+        content = self.BoxLayout(orientation='vertical')
+        self.file_chooser = self.FileChooserListView(
             path=os.path.expanduser('~'),
-            filters=['*.png', '*.jpg', '*.jpeg', '*.pdf']
+            filters=['*.png', '*.jpg', '.jpeg', '*.pdf']
         )
         content.add_widget(self.file_chooser)
         
-        buttons = BoxLayout(size_hint_y=None, height=dp(44))
-        select_btn = Button(text='Select')
-        cancel_btn = Button(text='Cancel')
+        buttons = self.BoxLayout(size_hint_y=None, height=self.dp(44))
+        select_btn = self.Button(text='Select')
+        cancel_btn = self.Button(text='Cancel')
         
         select_btn.bind(on_press=self.process_selected_file)
         cancel_btn.bind(on_press=self.dismiss_popup)
@@ -159,7 +105,7 @@ class TranslationApp(App):
         buttons.add_widget(cancel_btn)
         content.add_widget(buttons)
         
-        self.popup = Popup(title='Select File', content=content, size_hint=(0.9, 0.9))
+        self.popup = self.Popup(title='Select File', content=content, size_hint=(0.9, 0.9))
         self.popup.open()
     
     def dismiss_popup(self, instance):
@@ -227,11 +173,11 @@ class TranslationApp(App):
     
     def build(self):
         # Set minimum window size
-        Window.minimum_width = dp(600)
-        Window.minimum_height = dp(400)
+        self.Window.minimum_width = self.dp(600)
+        self.Window.minimum_height = self.dp(400)
         
         # Main layout
-        main_layout = BoxLayout(orientation='vertical', spacing=5)
+        main_layout = self.BoxLayout(orientation='vertical', spacing=5)
         
         # Custom title bar with language selection
         self.title_bar = CustomTitleBar()
@@ -247,71 +193,71 @@ class TranslationApp(App):
         )
         if self.font_path:
             input_kwargs['font_name'] = self.font_path
-        self.input_text = TextInput(**input_kwargs)
+        self.input_text = self.TextInput(**input_kwargs)
         
         # Translation engine selection and buttons
-        engine_layout = BoxLayout(
+        engine_layout = self.BoxLayout(
             size_hint_y=None,
-            height=dp(50),
+            height=self.dp(50),
             spacing=10,
             padding=[10, 5],
             orientation='horizontal',
             # Remove default stretching
             size_hint_x=None,
-            width=dp(900)  # Fixed width for the button row
+            width=self.dp(900)  # Fixed width for the button row
         )
         # Engine spinner with fixed size
-        self.engine = Spinner(
+        self.engine = self.Spinner(
             text='Google',
             values=('Google', 'DuckDuckGo', 'Yandex', 'DeepL'),
             size_hint=(None, None),
-            size=(dp(150), dp(40)),
+            size=(self.dp(150), self.dp(40)),
             pos_hint={'center_y': 0.5}
         )
         # File selection button with fixed size
-        file_btn = Button(
+        file_btn = self.Button(
             text='Select Image/PDF',
             size_hint=(None, None),
-            size=(dp(150), dp(40)),
+            size=(self.dp(150), self.dp(40)),
             pos_hint={'center_y': 0.5}
         )
         file_btn.bind(on_press=self.show_file_chooser)
         # Translate button with fixed size
-        translate_btn = Button(
+        translate_btn = self.Button(
             text='Translate',
             size_hint=(None, None),
-            size=(dp(150), dp(40)),
+            size=(self.dp(150), self.dp(40)),
             pos_hint={'center_y': 0.5}
         )
         translate_btn.bind(on_press=self.translate_text)
         # Copy button with fixed size
-        copy_btn = Button(
+        copy_btn = self.Button(
             text='Copy Translation',
             size_hint=(None, None),
-            size=(dp(150), dp(40)),
+            size=(self.dp(150), self.dp(40)),
             pos_hint={'center_y': 0.5}
         )
         copy_btn.bind(on_press=self.copy_translation)
         # Thesaurus language selection button
-        thesaurus_btn = Button(
+        thesaurus_btn = self.Button(
             text='Thesaurus Languages',
             size_hint=(None, None),
-            size=(dp(180), dp(40)),
+            size=(self.dp(180), self.dp(40)),
             pos_hint={'center_y': 0.5}
         )
         thesaurus_btn.bind(on_press=self.select_thesaurus_languages)
         # Container to left-align the buttons
-        left_buttons = BoxLayout(orientation='horizontal', size_hint=(None, 1))
+        left_buttons = self.BoxLayout(orientation='horizontal', size_hint=(None, 1))
         left_buttons.width = sum([
-            dp(150),  # engine
+            self.dp(150),  # engine
             10,
-            dp(150),  # file_btn
+            self.dp(150),  # file_btn
             10,
-            dp(150),  # translate_btn
+            self.dp(150),  # translate_btn
             10,
-            dp(150),  # copy_btn
+            self.dp(150),  # copy_btn
             10,
-            dp(180),  # thesaurus_btn
+            self.dp(180),  # thesaurus_btn
             10
         ])
         left_buttons.spacing = 10
@@ -336,7 +282,7 @@ class TranslationApp(App):
         )
         if self.font_path:
             result_kwargs['font_name'] = self.font_path
-        self.result_text = TextInput(**result_kwargs)
+        self.result_text = self.TextInput(**result_kwargs)
         
         # Add all widgets to main layout
         main_layout.add_widget(self.input_text)
@@ -471,28 +417,28 @@ class TranslationApp(App):
     
     def copy_translation(self, instance):
         if self.result_text.text:
-            Clipboard.copy(self.result_text.text)
-    
+            self.Clipboard.copy(self.result_text.text)
+
     def select_thesaurus_languages(self, instance=None):
         # Supported languages (except Chinese)
         supported = ['english', 'spanish', 'french', 'german', 'russian', 'italian']
-        content = BoxLayout(orientation='vertical', spacing=5)
+        content = self.BoxLayout(orientation='vertical', spacing=5)
         checkboxes = {}
         from kivy.uix.checkbox import CheckBox
         for lang in supported:
-            row = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40))
+            row = self.BoxLayout(orientation='horizontal', size_hint_y=None, height=self.dp(40))
             cb = CheckBox(active=(lang in self.enabled_thesaurus_langs))
             checkboxes[lang] = cb
             row.add_widget(cb)
-            row.add_widget(Label(text=lang.title(), size_hint_x=1))
+            row.add_widget(self.Label(text=lang.title(), size_hint_x=1))
             content.add_widget(row)
-        btn_row = BoxLayout(size_hint_y=None, height=dp(44))
-        save_btn = Button(text='Save', size_hint_x=0.5)
-        cancel_btn = Button(text='Cancel', size_hint_x=0.5)
+        btn_row = self.BoxLayout(size_hint_y=None, height=self.dp(44))
+        save_btn = self.Button(text='Save', size_hint_x=0.5)
+        cancel_btn = self.Button(text='Cancel', size_hint_x=0.5)
         btn_row.add_widget(save_btn)
         btn_row.add_widget(cancel_btn)
         content.add_widget(btn_row)
-        popup = Popup(title='Select Thesaurus Languages', content=content, size_hint=(0.6, 0.7))
+        popup = self.Popup(title='Select Thesaurus Languages', content=content, size_hint=(0.6, 0.7))
         def save_cb(instance):
             self.enabled_thesaurus_langs = set(lang for lang, cb in checkboxes.items() if cb.active)
             popup.dismiss()

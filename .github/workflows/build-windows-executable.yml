@@ -1,117 +1,35 @@
 name: Build Windows Executable
 
-# This permissions block automatically handles all required permissions
-permissions:
-  contents: write
-  packages: write
-  actions: write
-
 on:
   push:
-    branches: [ main ]
-    paths:
-      - '**.py'
-      - 'version.txt'
-      - '.github/workflows/**'
-  pull_request:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: ["main"]  # Or your default branch
 
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Get version
-        id: get_version
-        run: |
-          $version = (Get-Content version.txt).Trim()
-          echo "VERSION=$version" >> $env:GITHUB_ENV
-          echo "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller
-          pip install kivy==2.2.1
-          pip install kivy_deps.sdl2==0.6.0
-          pip install kivy_deps.glew==0.3.1
-          pip install kivy_deps.angle==0.3.3
-          pip install requests
-          pip install pytesseract
-          pip install Pillow
-          pip install PyPDF2
-          pip install PyDictionary
-          pip install nltk
-          pip install goslate
-          pip install beautifulsoup4
-          pip install flake8
-          pip install pytest
+          pip install -r requirements.txt
 
-      - name: Run linting
+      - name: Build with PyInstaller
         run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=venv,.venv
-
-      - name: Install Tesseract OCR
-        run: choco install tesseract -y
-
-      - name: Find tessdata directory
-        id: find_tessdata
-        shell: pwsh
-        run: |
-          $tessdata = "C:\\Program Files\\Tesseract-OCR\\tessdata"
-          if (-not (Test-Path $tessdata)) { Write-Error 'tessdata directory not found!'; exit 1 }
-          echo "TESSDATA_PATH=$tessdata" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "Found tessdata at $tessdata"
-
-      - name: Create Kivy config
-        run: |
-          echo "[graphics]" > kivy_config.ini
-          echo "multisamples = 0" >> kivy_config.ini
-          echo "window_icon = " >> kivy_config.ini
-          echo "exit_on_escape = 1" >> kivy_config.ini
-
-      - name: Build executable
-        shell: pwsh
-        run: |
-          $env:KIVY_WINDOW = 'mock'
-          pyinstaller --onefile --windowed --name translator main.py
-
-      - name: Create or update tag
-        shell: pwsh
-        run: |
-          $version = (Get-Content version.txt).Trim()
-          $tag = "v$version"
-          git config --global user.email "github-actions@github.com"
-          git config --global user.name "github-actions"
-          if (-not (git tag | Select-String $tag)) {
-            git tag $tag
-            git push origin $tag
-          }
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: dist/translator.exe
-          tag_name: v${{ env.VERSION }}
-          name: Release v${{ env.VERSION }}
-          body: |
-            Windows executable for version ${{ env.VERSION }}
-            
-            Changes in this version:
-            - See commit history for details
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          pyinstaller --clean --noconfirm translator.spec
+          mkdir dist_win
+          move dist\\translator.exe dist_win\\
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-executable-v${{ env.VERSION }}
-          path: dist/translator.exe
+          name: windows-executable
+          path: dist_win

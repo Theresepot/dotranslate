@@ -20,7 +20,7 @@ A powerful, privacy-friendly desktop translation app with offline OCR and file s
 ![Translation of pdf](screenshots/screenshot2.png)
   
 
-## Installation 
+## Installation
 
 ### Simply download compiled executables for Windows or Linux from [Releases](https://github.com/Theresepot/dotranslate/releases)
 

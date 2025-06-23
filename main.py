@@ -2,53 +2,57 @@ import os
 import sys
 import io
 
-# --- Environment Setup for Kivy ---
-
-# 1. Set Kivy window and graphics backend to solve issues on some systems.
-#    This must be done *before* any Kivy modules are imported.
+# --- Environment Setup for Kivy and Logging Fixes ---
 if sys.platform.startswith('win'):
-    # Use ANGLE for DirectX compatibility to avoid OpenGL errors in VMs
     os.environ['KIVY_GL_BACKEND'] = 'angle_sdl2'
-
-# 2. Set the window provider. 'sdl2' is standard and required by the backend.
 if 'KIVY_WINDOW' not in os.environ:
     os.environ['KIVY_WINDOW'] = 'sdl2'
 
-# 3. Redirect stdout and stderr for PyInstaller windowed apps on Windows.
-#    This prevents the app from crashing if it tries to print to a non-existent console.
-#    This is a common issue with apps built with --noconsole or --windowed.
-if sys.platform.startswith('win') and getattr(sys, 'frozen', False):
+# --- Patch: Always ensure stdout/stderr are not None ---
+if getattr(sys, 'frozen', False):  # Running as PyInstaller EXE
     if sys.stdout is None:
         sys.stdout = io.StringIO()
     if sys.stderr is None:
         sys.stderr = io.StringIO()
 
-# --- Main Application Execution ---
+    # Patch Kivy logger to always write to file if no console
+    import logging
+    log_path = os.path.join(os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else __file__), 'app.log')
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        handlers=[logging.FileHandler(log_path, encoding='utf-8')]
+    )
+    # Patch kivy logger
+    try:
+        from kivy.logger import Logger
+        from kivy.logger import LOG_LEVELS
+        Logger.handlers = []  # Remove default handlers
+        file_handler = logging.FileHandler(log_path, encoding='utf-8')
+        file_handler.setLevel(LOG_LEVELS["info"])
+        Logger.addHandler(file_handler)
+        Logger.info("Logger patched for bundled Windows EXE.")
+    except Exception as log_ex:
+        print(f"Kivy logger patch failed: {log_ex}")
 
-# Now that the environment is properly configured, we can safely import and run the app.
+# --- Main Application Execution ---
 try:
     from translator import TranslationApp
 
     if __name__ == '__main__':
-        # The 'frozen' attribute is set by PyInstaller when running as a bundled .exe
         is_frozen = getattr(sys, 'frozen', False)
         print(f"Running application... (Frozen: {is_frozen})")
         print(f"Platform: {sys.platform}")
-
         if sys.platform.startswith('win'):
             print(f"KIVY_GL_BACKEND = {os.environ.get('KIVY_GL_BACKEND')}")
             print(f"KIVY_WINDOW = {os.environ.get('KIVY_WINDOW')}")
-
         TranslationApp().run()
-
 except Exception as e:
     # If a crash occurs on startup, log it to a file for easier debugging.
-    # This is especially useful for tracking down issues in the bundled .exe.
     with open("error.log", "w", encoding="utf-8") as f:
         f.write("A critical error occurred during application startup:\n\n")
         f.write(str(e) + "\n\n")
         import traceback
         traceback.print_exc(file=f)
-
     # Also, print the error if a console is available.
-    print(f"A critical error occurred. See error.log for details: {e}") 
+    print(f"A critical error occurred. See error.log for details: {e}")
