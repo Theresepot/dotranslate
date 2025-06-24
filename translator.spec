@@ -1,11 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from kivy_deps import sdl2, glew
+import os
+
+block_cipher = None
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('translator.py', '.')],
+    datas=[],
     hiddenimports=['translator'],
     hookspath=[],
     hooksconfig={},
@@ -35,4 +39,19 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='icon.ico',
+    onefile=True,
+)
+
+# Bundle Kivy DLLs and prepare for Tesseract binary/data
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    *[Tree(p) for p in (sdl2.dep_bins + glew.dep_bins)],
+    # Add Tesseract binary and tessdata here if needed
+    strip=False,
+    upx=True,
+    name='translator',
 )

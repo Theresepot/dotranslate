@@ -2,6 +2,19 @@ import os
 import sys
 from PyDictionary import PyDictionary
 
+# --- Patch for bundled Tesseract in PyInstaller EXE ---
+try:
+    import pytesseract
+    if getattr(sys, 'frozen', False):
+        import os
+        # Assume tesseract.exe is bundled in the same directory as the EXE
+        exe_dir = os.path.dirname(sys.executable)
+        tesseract_path = os.path.join(exe_dir, 'tesseract.exe')
+        if os.path.exists(tesseract_path):
+            pytesseract.pytesseract.tesseract_cmd = tesseract_path
+except ImportError:
+    pass
+
 def find_tessdata_dir():
     if sys.platform.startswith('win'):
         possible = [
@@ -26,25 +39,25 @@ TESSDATA_DIR = os.environ.get('TESSDATA_PREFIX') or find_tessdata_dir()
 class TranslationApp:
     def __init__(self, **kwargs):
         # Import Kivy modules only when the app is instantiated
-from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.textinput import TextInput
-from kivy.uix.label import Label
-from kivy.uix.spinner import Spinner
-from kivy.uix.scrollview import ScrollView
-from kivy.core.window import Window
-from kivy.uix.gridlayout import GridLayout
-from kivy.metrics import dp
-from kivy.core.clipboard import Clipboard
-from kivy.config import Config
-from kivy.core.text import Label as CoreLabel
-from kivy.uix.filechooser import FileChooserListView
-from kivy.uix.popup import Popup
-from kivy.uix.widget import Widget
-from kivy.properties import ObjectProperty
-# Configure keyboard shortcuts
-Config.set('kivy', 'exit_on_escape', '0')
+        from kivy.app import App
+        from kivy.uix.boxlayout import BoxLayout
+        from kivy.uix.button import Button
+        from kivy.uix.textinput import TextInput
+        from kivy.uix.label import Label
+        from kivy.uix.spinner import Spinner
+        from kivy.uix.scrollview import ScrollView
+        from kivy.core.window import Window
+        from kivy.uix.gridlayout import GridLayout
+        from kivy.metrics import dp
+        from kivy.core.clipboard import Clipboard
+        from kivy.config import Config
+        from kivy.core.text import Label as CoreLabel
+        from kivy.uix.filechooser import FileChooserListView
+        from kivy.uix.popup import Popup
+        from kivy.uix.widget import Widget
+        from kivy.properties import ObjectProperty
+        # Configure keyboard shortcuts
+        Config.set('kivy', 'exit_on_escape', '0')
         # Assign imported classes to self for use in methods
         self.App = App
         self.BoxLayout = BoxLayout

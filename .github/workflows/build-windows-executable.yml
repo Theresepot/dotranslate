@@ -22,6 +22,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Download Tesseract OCR (Windows)
+        run: |
+          curl -L -o tesseract.zip https://github.com/UB-Mannheim/tesseract/wiki/tesseract-ocr-w64-setup-v5.3.3.20231005.exe
+          7z x tesseract.zip -otess_tmp
+          # Find tesseract.exe and tessdata
+          for /r tess_tmp %%f in (tesseract.exe) do copy "%%f" .
+          for /r tess_tmp %%d in (tessdata) do xcopy /E /I /Y "%%d" dist\tessdata
+          del /Q /F tesseract.zip
+          rmdir /S /Q tess_tmp
+
       - name: Set Kivy to use mock OpenGL backend
         run: echo "KIVY_GL_BACKEND=mock" >> $env:GITHUB_ENV
 
@@ -29,7 +39,9 @@ jobs:
         run: |
           pyinstaller --clean --noconfirm translator.spec
           mkdir dist_win
-          move dist\\translator.exe dist_win\\
+          move dist\translator.exe dist_win\
+          copy tesseract.exe dist_win\
+          xcopy /E /I /Y dist\tessdata dist_win\tessdata
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
